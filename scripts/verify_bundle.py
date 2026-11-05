@@ -117,6 +117,9 @@ EXPECTED_PATCHES = {
         "Hide Turbo promotions",
         "Reload stream",
         "UI settings",
+        # Ayufa original patch (not from upstream; added in v1.3.0).
+        # Its name is English by the same never-translate rule.
+        "Ayufa: Startup tab",
     },
 }
 # Upstream crimera/piko-newx v3.73.0's published patches-list.json

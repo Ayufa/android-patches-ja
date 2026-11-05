@@ -44,6 +44,7 @@
   4. 翻訳済み文字列を検証するテスト（`sources/twitch/` 内の `UiFeatureRegistryTest`、`SettingsSearchTest`、`scripts/tests/`）の期待値も、日本語化に合わせて更新します。
   5. 本家がパッチを追加・削除・改名したら、`scripts/verify_bundle.py` の `EXPECTED_PATCHES` も合わせて更新します。新しいパッチは、名前は本家の英語名のまま、説明にのみ日本語訳を付けます（名前は絶対に翻訳しない）。
   6. 取り込みコミットには規約型 `i18n` を使います。
+- 例外: Ayufa 独自パッチ「Ayufa: Startup tab」（v1.3.0 で追加）は本家に無い、こちら側のオリジナルです。実体は `sources/twitch/patches/.../twitch/startup/` と `sources/twitch/extensions/.../extension/startup/`、設定セクション `SettingSection.AYUFA`。本家の取り込みで削除したり、本家の流儀に寄せて改名したりしないでください。`EXPECTED_PATCHES` の Twitch 側に本家に無い名前が1件あるのは正常です。名前は恒久ルールどおり英語のまま（実行順序は名前で決まるため）、説明と UI は日本語、初期状態は未選択（default = false）です。
 
 ## v1.1.x の傘パッチ構成について（v1.2.0 で廃止）
 

@@ -10,7 +10,8 @@ public enum SettingSection {
     PLAYER_CONTROLS("プレイヤー操作", "ic_settings"),
     CHANNEL_ACTIONS("チャンネル操作", "ic_subscribe"),
     CHAT_OVERLAYS("チャット上の表示", "ic_emotes"),
-    DISPLAY("表示", "ic_fullscreen_enter");
+    DISPLAY("表示", "ic_fullscreen_enter"),
+    AYUFA("Ayufa", "ic_settings");
 
     private final String title;
     private final String icon;

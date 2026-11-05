@@ -63,6 +63,10 @@ v1.2.0 からは Twitch 側と同じくソースのコピーを保持する方�
 
 翻訳済み文字列を検証するテスト（`UiFeatureRegistryTest`、`SettingsSearchTest`、`scripts/tests/` の React Native 系）は、期待値を日本語に合わせて更新しています。対象ファイルの詳細な対応表は `sources/twitch/docs/LOCALIZATION.md` に保持しています。
 
+### Ayufa 独自パッチ（Twitch 側のみ）
+
+Twitch 側には、本家に無い Ayufa の独自パッチ「Ayufa: Startup tab」（v1.3.0 追加）が1件だけ含まれます。日本語化ではなく新機能（起動時に開くタブの選択）なので、文字列は最初から日本語で書き、パッチ名だけは恒久ルールに従って英語のままにします。初期状態は未選択（おすすめに含めない）です。詳細は `docs/UPSTREAM.md` の Twitch 側の例外注記を参照してください。
+
 ## 表記の方針
 
 - 設定名は簡潔に（Twitch 本家の「簡潔なラベル」方針に合わせる）。
