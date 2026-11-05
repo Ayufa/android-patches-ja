@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the combined Ayufa Patches JA bundle (one .mpp).
+"""Build the combined Ayufa Patches JP bundle (one .mpp).
 
 Both patch sets are kept in this repository as translated source
 copies (the "clone upstream + translate only" model, v1.2.0+):
@@ -65,14 +65,14 @@ TWITCH_SOURCES = REPO_ROOT / "sources" / "twitch"
 
 # Combined bundle metadata written into the temporary tree's
 # patches/build.gradle.kts about block (ends up in the .mpp MANIFEST).
-BUNDLE_NAME = "Ayufa Patches JA"
+BUNDLE_NAME = "Ayufa Patches JP"
 BUNDLE_DESCRIPTION = (
     "X (NewX) と Twitch の Morphe パッチを1つにまとめた日本語化バンドル"
 )
-BUNDLE_SOURCE = "https://github.com/Ayufa/ayufa-patches-ja"
+BUNDLE_SOURCE = "https://github.com/Ayufa/ayufa-patches-jp"
 BUNDLE_AUTHOR = "Ayufa"
 BUNDLE_CONTACT = ""
-BUNDLE_WEBSITE = "https://github.com/Ayufa/ayufa-patches-ja"
+BUNDLE_WEBSITE = "https://github.com/Ayufa/ayufa-patches-jp"
 BUNDLE_LICENSE = "GNU General Public License v3.0"
 
 
@@ -241,7 +241,7 @@ def _rewrite_about_block(piko_directory: Path) -> None:
                 f"replaced {replaced}"
             )
     build_file.write_text("".join(lines), encoding="utf-8")
-    print("Rewrote bundle about metadata for Ayufa Patches JA")
+    print("Rewrote bundle about metadata for Ayufa Patches JP")
 
 
 def prepare_build_tree(piko_directory: Path) -> None:
@@ -433,7 +433,7 @@ def build_combined(
         (PIKO_SOURCES / XLITE_CONSTANTS).read_text(encoding="utf-8")
     )
 
-    with tempfile.TemporaryDirectory(prefix="ayufa-patches-ja-") as temporary_directory:
+    with tempfile.TemporaryDirectory(prefix="ayufa-patches-jp-") as temporary_directory:
         piko_directory = Path(temporary_directory) / "piko"
 
         prepare_build_tree(piko_directory)

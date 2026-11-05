@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO = "Ayufa/ayufa-patches-ja"
+REPO = "Ayufa/ayufa-patches-jp"
 
 
 def main() -> None:

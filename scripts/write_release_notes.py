@@ -98,7 +98,7 @@ def main() -> None:
         f"v{metadata.get('twitch_base_version')}",
         f"- Patcher-Version: {summary.get('manifest', {}).get('Patcher-Version')}",
         "",
-        "Morphe への追加: https://morphe.software/add-source?github=Ayufa/ayufa-patches-ja",
+        "Morphe への追加: https://morphe.software/add-source?github=Ayufa/ayufa-patches-jp",
         "",
     ]
     Path(args.out).write_text("\n".join(lines), encoding="utf-8")

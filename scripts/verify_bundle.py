@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a combined Ayufa Patches JA bundle (.mpp).
+"""Verify a combined Ayufa Patches JP bundle (.mpp).
 
 Checks that the single bundle really contains both patch sets:
 
@@ -303,8 +303,8 @@ def main() -> int:
             line.split(": ", 1) for line in manifest.splitlines() if ": " in line
         )
         summary["manifest"] = fields
-        if fields.get("Name") == "Ayufa Patches JA":
-            ok("MANIFEST Name is Ayufa Patches JA")
+        if fields.get("Name") == "Ayufa Patches JP":
+            ok("MANIFEST Name is Ayufa Patches JP")
         else:
             fail(f"MANIFEST Name is {fields.get('Name')!r}", failures)
         if args.version and fields.get("Version") != args.version:

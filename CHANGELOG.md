@@ -2,6 +2,11 @@
 
 このプロジェクトのバージョンは、バンドル全体に対する独立したセマンティックバージョニング（`vX.Y.Z`）で管理します。上流（crimera/piko、ryykitty/twitch-patched）のバージョンとは連動しません。方針は [docs/UPSTREAM.md](docs/UPSTREAM.md) を参照してください。
 
+## [1.3.3] - 2026-11-05
+
+- 本人の指定により、リポジトリ名を `Ayufa/ayufa-patches-jp` に変更し、バンドルの表示名も「Ayufa Patches JP」に統一しました（v1.3.2 の `ayufa-patches-ja` から末尾を ja → jp に変更）。パッチの機能変更はありません。
+- 旧リポジトリの URL（`Ayufa/android-patches-ja`、`Ayufa/ayufa-patches-ja`）は GitHub のリダイレクトで新しい URL に転送されるため、Morphe に登録済みのソースはそのまま使えます。
+
 ## [1.3.2] - 2026-11-05
 
 - **リポジトリ名を `Ayufa/android-patches-ja` から `Ayufa/ayufa-patches-ja` に変更**し、バンドルの表示名も「Android Patches JA」から「Ayufa Patches JA」に統一しました。パッチの機能変更はありません。
