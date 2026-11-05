@@ -79,7 +79,7 @@ private data class TabRouteRead(
 @Suppress("unused")
 val restorePinnedHomeTabPatch =
     bytecodePatch(
-        name = "ピン留めしたタブを再度開く",
+        name = "NewX: Restore pinned home tab",
         description = "アプリ起動時に、最後に見ていたピン留め済みのリスト・トピック・コミュニティのタブを再び開きます。",
     ) {
         unsupportedOnMount()

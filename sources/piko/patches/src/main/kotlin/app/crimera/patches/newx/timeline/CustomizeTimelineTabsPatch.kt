@@ -63,7 +63,7 @@ private data class HomeTabListFactory(
 @Suppress("unused")
 val customizeNewXTimelineTabsPatch =
     bytecodePatch(
-        name = "タイムラインタブをカスタマイズ",
+        name = "NewX: Customize timeline tabs",
         description = "NewXのホームタイムラインで、「おすすめ」または「フォロー中」のタブを非表示にします。",
     ) {
         unsupportedOnMount()

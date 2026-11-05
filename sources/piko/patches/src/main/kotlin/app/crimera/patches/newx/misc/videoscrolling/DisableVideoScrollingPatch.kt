@@ -146,7 +146,7 @@ private fun patchVerticalPager(
 @Suppress("unused")
 val newXDisableVideoScrollingPatch =
     bytecodePatch(
-        name = "動画プレーヤーのスクロールを無効化",
+        name = "NewX: Disable video player scrolling",
         description = "再生コントロールや他のジェスチャーは使えるまま、NewXの動画プレーヤーの縦スワイプを無効にします。",
     ) {
         unsupportedOnMount()

@@ -1214,7 +1214,7 @@ private fun requireImmersiveOnlyPhotoViewerReply(
 @Suppress("unused")
 val newXHidePostReplyBarPatch =
     bytecodePatch(
-        name = "ポストの返信バーを非表示",
+        name = "NewX: Hide post reply bar",
         description = "ポスト詳細に常時表示される返信バーを非表示にします。作成ボタンは引き続き使えます。",
     ) {
         unsupportedOnMount()

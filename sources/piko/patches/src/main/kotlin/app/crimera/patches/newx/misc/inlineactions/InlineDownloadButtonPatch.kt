@@ -105,7 +105,7 @@ private fun MutableMethod.requireStatic(label: String) {
 @Suppress("unused")
 val newXInlineDownloadButtonPatch =
     bytecodePatch(
-        name = "インラインダウンロードボタン",
+        name = "NewX: Inline download button",
         description = "NewXのポストの下にダウンロードボタンを追加し、選んだフォルダへメディアを保存します。ファイル名はテンプレートでカスタマイズできます。",
     ) {
         unsupportedOnMount()

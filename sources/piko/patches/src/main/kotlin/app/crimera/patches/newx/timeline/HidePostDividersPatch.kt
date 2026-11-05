@@ -596,7 +596,7 @@ private fun patchTimelineModuleDividers(
 val newXHidePostDividersPatch =
     bytecodePatch(
         default = false,
-        name = "ポストの区切り線を非表示",
+        name = "NewX: Hide post dividers",
         description = "NewXのタイムラインに表示される、ポストと返信の区切り線を取り除きます。",
     ) {
         unsupportedOnMount(default = false)

@@ -121,7 +121,7 @@ private fun MutableMethod.insertEmojiProcessingHook(
 @Suppress("unused")
 val customFontPatch =
     bytecodePatch(
-        name = "カスタムフォント",
+        name = "NewX: Custom font",
         description = "フォントのスタイルをカスタマイズします。",
     ) {
         unsupportedOnMount()

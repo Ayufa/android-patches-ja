@@ -265,7 +265,7 @@ private data class PostLoadScrollCallSite(
 @Suppress("unused")
 val restoreTimelinePositionPatch =
     bytecodePatch(
-        name = "タイムラインの位置を復元",
+        name = "NewX: Restore timeline position",
         description = "対応するタイムラインの位置を保存し、アプリのプロセスが再起動したあとに復元します。",
     ) {
         unsupportedOnMount()

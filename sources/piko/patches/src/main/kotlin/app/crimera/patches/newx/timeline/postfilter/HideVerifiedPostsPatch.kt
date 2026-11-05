@@ -22,7 +22,7 @@ private const val FILTERED_REPLIES_HANDLER =
 @Suppress("unused")
 val newXHideVerifiedPostsPatch =
     bytecodePatch(
-        name = "認証タイプでポストを非表示",
+        name = "NewX: Hide posts by verified account type",
         description = "タイムラインで判定された認証タイプのうち、選んだタイプのアカウントによるポストと返信を非表示にします。",
     ) {
         unsupportedOnMount()

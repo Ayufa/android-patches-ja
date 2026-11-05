@@ -51,7 +51,7 @@ private val newXCrashLogsResourcePatch =
 @Suppress("unused")
 val newXCrashLogsPatch =
     bytecodePatch(
-        name = "クラッシュログ",
+        name = "NewX: Crash logs",
         description = "クラッシュログを保存し、共有とコピーができる通知を表示します。",
     ) {
         unsupportedOnMount()

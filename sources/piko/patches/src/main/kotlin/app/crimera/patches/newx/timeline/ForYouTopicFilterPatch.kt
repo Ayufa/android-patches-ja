@@ -147,7 +147,7 @@ private data class ResolvedModernForYouTabHook(
 @Suppress("unused")
 val newXForYouTopicFilterPatch =
     bytecodePatch(
-        name = "おすすめのトピックフィルター",
+        name = "NewX: Filter For You by topic",
         description = "NewXの「おすすめ」タイムラインを、選んだトピックだけに絞り込みます。",
     ) {
         unsupportedOnMount()

@@ -24,7 +24,7 @@ private object DeletedMessageFormatterFingerprint : Fingerprint(
 
 @Suppress("unused")
 val showDeletedMessagesPatch = bytecodePatch(
-    name = "削除されたメッセージを表示",
+    name = "Show deleted messages",
     description = "削除・モデレーションされたチャットメッセージを読める状態に保ちます。",
     default = true,
 ) {

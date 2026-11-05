@@ -128,7 +128,7 @@ private data class InlinedUrlPickerNormalization(
 @Suppress("unused")
 val newXCanonicalUrlsPatch =
     bytecodePatch(
-        name = "正規URLを直接開く",
+        name = "NewX: Open canonical URLs",
         description = "リンクをタップしたとき、短縮されたt.coリンクではなく、展開済みの正規URLを直接開きます。",
     ) {
         unsupportedOnMount()

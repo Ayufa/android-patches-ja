@@ -23,7 +23,7 @@ private object SubscriptionPromotionRendererFingerprint : Fingerprint(
 
 @Suppress("unused")
 val hideSubscriptionBannersPatch = bytecodePatch(
-    name = "サブスク割引バナーを非表示",
+    name = "Hide subscription discount banners",
     description = "サブスクの案内、割引バナー、プロモーションラベルを非表示にします。",
     default = true,
 ) {

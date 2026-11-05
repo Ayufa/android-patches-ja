@@ -66,7 +66,7 @@ private fun String.isObjectDescriptor(): Boolean = startsWith('L') && endsWith('
 @Suppress("unused")
 val newXHideSpacesBarPatch =
     bytecodePatch(
-        name = "スペースバーを非表示",
+        name = "NewX: Hide Spaces bar",
         description = "NewXのタイムライン上部のスペースバーを非表示にします。",
     ) {
         unsupportedOnMount()

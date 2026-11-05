@@ -20,7 +20,7 @@ private object DisplayAdResponseParserFingerprint : Fingerprint(
 
 @Suppress("unused")
 val hideDisplayAdsPatch = bytecodePatch(
-    name = "フィードとディスプレイ広告を非表示",
+    name = "Hide feed and display ads",
     description = "スポンサー付きフィードカード、バナー、ディスプレイ広告を非表示にします。",
     default = true,
 ) {

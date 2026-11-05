@@ -152,7 +152,7 @@ private fun unlockColorCustomization(match: Match) {
 @Suppress("unused")
 val newXUnlockColorCustomizationPatch =
     bytecodePatch(
-        name = "色のカスタマイズを解放",
+        name = "NewX: Unlock color customization",
         description = "プレミアムでないユーザーでも、アプリ標準の色セレクターを使えるようにします。",
     ) {
         compatibleWith(COMPATIBILITY_NEW_X)

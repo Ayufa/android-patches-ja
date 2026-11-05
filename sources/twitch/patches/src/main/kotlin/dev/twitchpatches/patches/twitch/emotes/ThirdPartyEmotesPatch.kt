@@ -8,7 +8,7 @@ import dev.twitchpatches.patches.twitch.shared.*
 
 @Suppress("unused")
 val thirdPartyEmotesPatch = bytecodePatch(
-    name = "BTTV、FFZ、7TVのエモート",
+    name = "BTTV, FFZ and 7TV emotes",
     description = "グローバルとチャンネルのエモートを、チャット、自動補完、エモートピッカーに追加します。アニメーションと入力プレビューに対応します。",
     default = true,
 ) {

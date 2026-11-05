@@ -173,7 +173,7 @@ private fun FieldReference.isSameField(other: FieldReference): Boolean =
 @Suppress("unused")
 val disableTimelineRefreshPatch =
     bytecodePatch(
-        name = "タイムラインの自動更新を無効化",
+        name = "NewX: Disable automatic timeline refresh",
         description = "起動時やフォアグラウンドに戻ったときの、タイムラインの自動ジャンプを防ぎます。",
     ) {
         unsupportedOnMount()

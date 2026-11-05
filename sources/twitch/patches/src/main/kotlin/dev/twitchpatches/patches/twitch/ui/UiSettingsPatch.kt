@@ -9,7 +9,7 @@ internal const val UI_SETTINGS = "Ldev/twitchpatches/extension/ui/UiSettings;"
 
 @Suppress("unused")
 val uiSettingsPatch = bytecodePatch(
-    name = "UI設定",
+    name = "UI settings",
     description = "プレイヤー操作、チャンネル操作、拡張機能、ハイプトレイン、ランキング、全画面時のシステムバーをカスタマイズします。",
     default = true,
 ) {

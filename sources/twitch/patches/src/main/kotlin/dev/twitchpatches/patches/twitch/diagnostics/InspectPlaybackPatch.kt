@@ -11,7 +11,7 @@ private const val TRACE = "Ldev/twitchpatches/extension/diagnostics/PlaybackTrac
 
 @Suppress("unused")
 val inspectPlaybackPatch = bytecodePatch(
-    name = "再生の診断",
+    name = "Playback diagnostics",
     description = "トラブルシューティング用に、プレイリストのメタデータと再生カウンターを記録します。",
     default = false,
 ) {

@@ -15,7 +15,7 @@
   - お気に入りの追加・削除ラベル: `emotes/FavoriteEmoteCard.java`、`emotes/FavoriteEmoteMenu.java`
   - 削除済みメッセージのラベル: `chat/DeletedMessageLabel.java`（「（削除済み）」）
 - Morphe のパッチ選択画面（パッチ定義の Kotlin コード）
-  - 全13パッチの名前と説明（`patches/src/main/kotlin/dev/twitchpatches/patches/twitch/` 配下の各 Patch ファイル）
+  - 全13パッチの説明（`patches/src/main/kotlin/dev/twitchpatches/patches/twitch/` 配下の各 Patch ファイル）。パッチ名は本家の英語名のまま（パッチャーが名前順に実行するため、名前は絶対に翻訳しない恒久ルール。詳細は統合リポジトリの `docs/LOCALIZATION.md`）
   - 対応バージョンの説明（`shared/TwitchTarget.kt`）
   - Twitch 本体の設定一覧に出る入口名「パッチ設定」（`settings/SettingsPatch.kt` の const-string）
 - React Native 側の表示文字列（`patches/src/main/resources/reactnative/`）

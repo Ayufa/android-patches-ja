@@ -187,7 +187,7 @@ private fun patchRenditionDiagnostics(match: Match) {
 @Suppress("unused")
 val newXAudioRenditionDiagnosticsPatch =
     bytecodePatch(
-        name = "HLS音声レンディションのログ",
+        name = "NewX: Log HLS audio renditions",
         description = "診断専用です。HLSプレイリストのURIと、レンディションIDが音声パターンにどう一致するかを記録します。Pikoのログ記録を有効にする必要があります。",
         default = false,
     ) {

@@ -196,7 +196,7 @@ private fun MutableMethod.disabledUpsellField(startIndex: Int): FieldReference {
 @Suppress("unused")
 val hidePremiumUpsellPatch =
     bytecodePatch(
-        name = "プレミアムのアップセルを非表示",
+        name = "NewX: Hide premium upsell",
         description = "NewXのホーム上部のバーから、プレミアムのアップセルチップを非表示にします。",
     ) {
         unsupportedOnMount()

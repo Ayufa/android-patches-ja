@@ -10,7 +10,7 @@ import app.morphe.patcher.patch.bytecodePatch
 @Suppress("unused")
 val newXRemoveShareTrackingQueryPatch =
     bytecodePatch(
-        name = "共有リンクのトラッキング除去",
+        name = "NewX: Remove share tracking parameters",
         description = "共有するXのURLから帰属パラメータ（a= と s=）を取り除く、リンクの設定を追加します。",
     ) {
         unsupportedOnMount()

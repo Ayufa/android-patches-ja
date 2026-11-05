@@ -15,10 +15,15 @@ Checks that the single bundle really contains both patch sets:
   individually again (no umbrella patches). When a patches-list.json
   from the build is given, it must contain exactly the patches of the
   two source copies -- 52 for X (com.twitter.android) and 13 for
-  Twitch (tv.twitch.android.app) -- with the Japanese names below,
-  and every listed name must be present in classes.dex. When upstream
-  adds/removes/renames a patch, update EXPECTED_PATCHES together with
-  the source copies (see docs/UPSTREAM.md).
+  Twitch (tv.twitch.android.app). Since v1.2.1 the patch NAMES are
+  upstream's English names, never translated: the Morphe patcher
+  executes patches sorted by name, so translated names changed the
+  execution order versus upstream and broke patches on device (see
+  docs/UPSTREAM.md). Only descriptions and in-app UI strings are
+  Japanese, so every listed description must contain Japanese text.
+  Every listed name must also be present in classes.dex. When
+  upstream adds/removes/renames a patch, update EXPECTED_PATCHES
+  together with the source copies (see docs/UPSTREAM.md).
 
 Writes a bundle-summary.json next to the bundle and exits non-zero
 when any check fails.
@@ -38,79 +43,138 @@ EXPECTED_EXTENSIONS = {
 }
 JA_STRINGS_ENTRY = "addresources/values-ja-rJP/newx/strings.xml"
 # The full listed patch inventory of the two source copies
-# (sources/piko @ 340dd02, sources/twitch @ v1.5.0 base), with the
-# Japanese patch names as translated in the copies.
+# (sources/piko @ 340dd02, sources/twitch @ v1.5.0 base). Patch names
+# are upstream's English names and are NEVER translated (the patcher
+# sorts execution by name; see docs/UPSTREAM.md). The X list is kept
+# in the exact order of upstream crimera/piko-newx v3.73.0's
+# published patches-list.json.
 EXPECTED_PATCHES = {
     "com.twitter.android": {
-        "広告を除去",
-        "ぼかし効果を無効化",
-        "Twitterブランディングに戻す",
-        "ツイートオブジェクトを表示",
-        "正規URLを直接開く",
-        "クローン",
-        "クラッシュログ",
-        "カスタムフォント",
-        "共有ドメインのカスタマイズ",
-        "固定の共有リンク",
-        "共有リンクのトラッキング除去",
-        "ドロワー項目をカスタマイズ",
-        "テーマ",
-        "機能スイッチの上書き",
-        "便利な機能フラグを有効化",
-        "インラインアクションをカスタマイズ",
-        "インラインダウンロードボタン",
-        "標準ダウンロードの保存先を変更",
-        "HLS音声レンディションのログ",
-        "メディアメニュー項目をカスタマイズ",
-        "メディアタブのデフォルト",
-        "写真タブのギャラリー表示",
-        "ナビゲーションバーをカスタマイズ",
-        "ポスト作成者のアクションを非表示",
-        "ポストの返信バーを非表示",
-        "ポストメニュー項目をカスタマイズ",
-        "プロフィールのポストのデフォルト並び順",
-        "プロフィールタブをカスタマイズ",
-        "返信のデフォルト並び順",
-        "サーバーエラーのログ記録",
-        "動画プレーヤーのスクロールを無効化",
-        "プレミアムのアップセルを非表示",
-        "色のカスタマイズを解放",
-        "ダウンロードを解放",
-        "タイムラインタブをカスタマイズ",
-        "タイムラインの自動更新を無効化",
-        "おすすめのトピックフィルター",
-        "AI生成ポストを非表示",
-        "「もっと見る」を非表示",
-        "作成ボタンを非表示",
-        "新着ポストのピルを非表示",
-        "ポストの区切り線を非表示",
-        "スペースバーを非表示",
-        "タイムラインのタブバーを非表示",
-        "おすすめユーザーを非表示",
-        "ピン留めしたタブを再度開く",
-        "タイムラインの位置を復元",
-        "アンケート結果を表示",
-        "センシティブなメディアを表示",
-        "認証タイプでポストを非表示",
-        "キーワードでポストをフィルター",
-        "翻訳",
+        "NewX: Remove ads",
+        "NewX: Disable blur effects",
+        "NewX: Restore Twitter branding",
+        "NewX: Browse tweet object",
+        "NewX: Open canonical URLs",
+        "NewX: Clone",
+        "NewX: Crash logs",
+        "NewX: Custom font",
+        "NewX: Custom sharing domain",
+        "NewX: Permanent share links",
+        "NewX: Remove share tracking parameters",
+        "NewX: Customize drawer items",
+        "NewX: Theme",
+        "NewX: Feature switch overrides",
+        "NewX: Enable quality-of-life feature flags",
+        "NewX: Customize inline actions",
+        "NewX: Inline download button",
+        "NewX: Redirect downloads to chosen folder",
+        "NewX: Log HLS audio renditions",
+        "NewX: Customize media menu items",
+        "NewX: Set default media tab",
+        "NewX: Gallery profile Photos tab",
+        "NewX: Customize navigation bar",
+        "NewX: Hide post author actions",
+        "NewX: Hide post reply bar",
+        "NewX: Customize post menu items",
+        "NewX: Set default profile post sorting",
+        "NewX: Customize profile tabs",
+        "NewX: Set default reply sorting",
+        "NewX: Server error logging",
+        "NewX: Disable video player scrolling",
+        "NewX: Hide premium upsell",
+        "NewX: Unlock color customization",
+        "NewX: Unlock downloads",
+        "NewX: Customize timeline tabs",
+        "NewX: Disable automatic timeline refresh",
+        "NewX: Filter For You by topic",
+        "NewX: Hide AI-generated posts",
+        "NewX: Hide Discover more",
+        "NewX: Hide compose button",
+        "NewX: Hide new posts pill",
+        "NewX: Hide post dividers",
+        "NewX: Hide Spaces bar",
+        "NewX: Hide timeline tabs bar",
+        "NewX: Hide who to follow",
+        "NewX: Restore pinned home tab",
+        "NewX: Restore timeline position",
+        "NewX: Show poll results",
+        "NewX: Show sensitive media",
+        "NewX: Hide posts by verified account type",
+        "NewX: Filter posts by keyword",
+        "NewX: Translator",
     },
     "tv.twitch.android.app": {
-        "クライアント要求の広告をブロック",
-        "フィードとディスプレイ広告を非表示",
-        "配信中の広告をブロック",
-        "ボーナスチャンネルポイントを自動で受け取る",
-        "削除されたメッセージを表示",
-        "Twitch APKを検査",
-        "再生の診断",
-        "お気に入りエモート",
-        "BTTV、FFZ、7TVのエモート",
-        "サブスク割引バナーを非表示",
-        "Turboのプロモーションを非表示",
-        "配信を再読み込み",
-        "UI設定",
+        "Block client-requested ads",
+        "Hide feed and display ads",
+        "Block stream ads",
+        "Auto-claim bonus channel points",
+        "Show deleted messages",
+        "Inspect Twitch APK",
+        "Playback diagnostics",
+        "Favorite emotes",
+        "BTTV, FFZ and 7TV emotes",
+        "Hide subscription discount banners",
+        "Hide Turbo promotions",
+        "Reload stream",
+        "UI settings",
     },
 }
+# Upstream crimera/piko-newx v3.73.0's published patches-list.json
+# order for X (the generated list must keep this order).
+EXPECTED_X_ORDER = [
+    "NewX: Remove ads",
+    "NewX: Disable blur effects",
+    "NewX: Restore Twitter branding",
+    "NewX: Browse tweet object",
+    "NewX: Open canonical URLs",
+    "NewX: Clone",
+    "NewX: Crash logs",
+    "NewX: Custom font",
+    "NewX: Custom sharing domain",
+    "NewX: Permanent share links",
+    "NewX: Remove share tracking parameters",
+    "NewX: Customize drawer items",
+    "NewX: Theme",
+    "NewX: Feature switch overrides",
+    "NewX: Enable quality-of-life feature flags",
+    "NewX: Customize inline actions",
+    "NewX: Inline download button",
+    "NewX: Redirect downloads to chosen folder",
+    "NewX: Log HLS audio renditions",
+    "NewX: Customize media menu items",
+    "NewX: Set default media tab",
+    "NewX: Gallery profile Photos tab",
+    "NewX: Customize navigation bar",
+    "NewX: Hide post author actions",
+    "NewX: Hide post reply bar",
+    "NewX: Customize post menu items",
+    "NewX: Set default profile post sorting",
+    "NewX: Customize profile tabs",
+    "NewX: Set default reply sorting",
+    "NewX: Server error logging",
+    "NewX: Disable video player scrolling",
+    "NewX: Hide premium upsell",
+    "NewX: Unlock color customization",
+    "NewX: Unlock downloads",
+    "NewX: Customize timeline tabs",
+    "NewX: Disable automatic timeline refresh",
+    "NewX: Filter For You by topic",
+    "NewX: Hide AI-generated posts",
+    "NewX: Hide Discover more",
+    "NewX: Hide compose button",
+    "NewX: Hide new posts pill",
+    "NewX: Hide post dividers",
+    "NewX: Hide Spaces bar",
+    "NewX: Hide timeline tabs bar",
+    "NewX: Hide who to follow",
+    "NewX: Restore pinned home tab",
+    "NewX: Restore timeline position",
+    "NewX: Show poll results",
+    "NewX: Show sensitive media",
+    "NewX: Hide posts by verified account type",
+    "NewX: Filter posts by keyword",
+    "NewX: Translator",
+]
 EXPECTED_LISTED_COUNT = sum(len(names) for names in EXPECTED_PATCHES.values())
 # Code markers proving both patch sets survived in classes.dex, plus
 # the settings key of a settings-gated opt-in NewX patch (Hide post
@@ -135,13 +199,13 @@ def ok(message: str) -> None:
 
 
 def load_patches(patches_list_path: Path) -> list[dict]:
-    """Return [{name, packages}] from a generated patches-list.json."""
+    """Return [{name, description, packages}] from a patches-list.json."""
     data = json.loads(patches_list_path.read_text(encoding="utf-8"))
     entries = data["patches"] if isinstance(data, dict) else data
     patches = []
     for entry in entries:
         if isinstance(entry, str):
-            patches.append({"name": entry, "packages": []})
+            patches.append({"name": entry, "description": None, "packages": []})
         else:
             compat = entry.get("compatiblePackages") or []
             if isinstance(compat, dict):
@@ -150,7 +214,13 @@ def load_patches(patches_list_path: Path) -> list[dict]:
                 packages = sorted(
                     item["packageName"] for item in compat if item.get("packageName")
                 )
-            patches.append({"name": str(entry["name"]), "packages": packages})
+            patches.append(
+                {
+                    "name": str(entry["name"]),
+                    "description": entry.get("description"),
+                    "packages": packages,
+                }
+            )
     return patches
 
 
@@ -278,9 +348,18 @@ def main() -> int:
                 elif patch["name"] not in expected_names:
                     fail(
                         f"listed patch for {package} is {patch['name']!r}, "
-                        f"expected one of the translated patch names",
+                        f"expected one of the upstream English patch names",
                         failures,
                     )
+            description = patch.get("description")
+            if description is not None and not re.search(
+                r"[\u3040-\u30ff\u4e00-\u9fff]", description
+            ):
+                fail(
+                    f"listed patch {patch['name']!r} has a non-Japanese "
+                    f"description: {description!r}",
+                    failures,
+                )
             if patch["name"].encode("utf-8") not in dex:
                 fail(f"listed patch name missing from classes.dex: {patch['name']}", failures)
         expected_pairs = {
@@ -292,6 +371,19 @@ def main() -> int:
             fail(
                 f"listed (app, patch) pairs differ: missing "
                 f"{sorted(expected_pairs - seen)}, unexpected {sorted(seen - expected_pairs)}",
+                failures,
+            )
+        x_order = [
+            patch["name"]
+            for patch in listed
+            if "com.twitter.android" in patch["packages"]
+        ]
+        if x_order == EXPECTED_X_ORDER:
+            ok("X patches are listed in upstream's published order")
+        else:
+            fail(
+                "X patches are not listed in upstream's published order: "
+                f"{x_order}",
                 failures,
             )
     else:

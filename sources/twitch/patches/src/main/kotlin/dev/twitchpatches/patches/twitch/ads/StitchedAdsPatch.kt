@@ -9,7 +9,7 @@ import dev.twitchpatches.patches.twitch.shared.IVS_NET
 
 @Suppress("unused")
 val blockStitchedAdsPatch = bytecodePatch(
-    name = "配信中の広告をブロック",
+    name = "Block stream ads",
     description = "検出した開始前・途中の広告を、Twitchの直接再生に置き換えます。",
     default = true,
 ) {

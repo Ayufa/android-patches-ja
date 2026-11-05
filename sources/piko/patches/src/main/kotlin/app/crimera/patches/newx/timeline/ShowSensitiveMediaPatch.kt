@@ -45,7 +45,7 @@ private fun isMediaVisibilityWrite(
 @Suppress("unused")
 val newXShowSensitiveMediaPatch =
     bytecodePatch(
-        name = "センシティブなメディアを表示",
+        name = "NewX: Show sensitive media",
         description = "NewXで、確認なしにセンシティブなメディアを表示します。",
     ) {
         unsupportedOnMount()

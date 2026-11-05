@@ -337,7 +337,7 @@ internal fun MutableMethod.installReplySortingSelectionHook(site: ReplySortingSe
 @Suppress("unused")
 val newXDefaultReplySortingPatch =
     bytecodePatch(
-        name = "返信のデフォルト並び順",
+        name = "NewX: Set default reply sorting",
         description = "NewXのポスト詳細で、返信の既定の並び順を選べるようにします。",
     ) {
         unsupportedOnMount()

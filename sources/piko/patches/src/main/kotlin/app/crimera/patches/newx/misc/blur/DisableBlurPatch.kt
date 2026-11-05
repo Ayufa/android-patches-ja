@@ -126,7 +126,7 @@ private fun patchHazeBlurSetter(
 @Suppress("unused")
 val newXDisableBlurPatch =
     bytecodePatch(
-        name = "ぼかし効果を無効化",
+        name = "NewX: Disable blur effects",
         description = "NewXのCompose UIのHazeぼかしを無効にします。設定した代替の色合いやスクリム効果は維持されます。",
     ) {
         unsupportedOnMount()

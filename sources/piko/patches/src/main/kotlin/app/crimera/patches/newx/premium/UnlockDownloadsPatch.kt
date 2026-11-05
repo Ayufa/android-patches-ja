@@ -617,7 +617,7 @@ private fun requireMatches(
 @Suppress("unused")
 val newXDownloadPatch =
     bytecodePatch(
-        name = "ダウンロードを解放",
+        name = "NewX: Unlock downloads",
         description = "NewXでメディアのダウンロードと、動画のオフライン保存を解放します。",
     ) {
         compatibleWith(COMPATIBILITY_NEW_X)

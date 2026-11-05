@@ -54,7 +54,7 @@ private object BillingAvailabilityFingerprint : Fingerprint(
 
 @Suppress("unused")
 val clonePatch = resourcePatch(
-    name = "クローン",
+    name = "NewX: Clone",
     description = "パッケージ名とアプリ名を変更します。パッチ適用済みのXを、元のXや別のパッチ適用済みXと並べてインストールできます。",
     default = false,
 ) {

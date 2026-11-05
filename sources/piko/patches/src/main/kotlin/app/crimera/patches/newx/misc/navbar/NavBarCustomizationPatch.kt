@@ -120,7 +120,7 @@ private data class ResolvedNavBarDestination(
 @Suppress("unused")
 val customizeNewXNavBarPatch =
     bytecodePatch(
-        name = "ナビゲーションバーをカスタマイズ",
+        name = "NewX: Customize navigation bar",
         description = "NewXの下部ナビゲーションバーの項目を、並べ替え・非表示・置き換えできます。",
     ) {
         unsupportedOnMount()

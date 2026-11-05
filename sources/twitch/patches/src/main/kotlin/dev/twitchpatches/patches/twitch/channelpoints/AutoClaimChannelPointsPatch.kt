@@ -9,7 +9,7 @@ import dev.twitchpatches.patches.twitch.shared.reactNativeBridgePatch
 
 @Suppress("unused")
 val autoClaimChannelPointsPatch = bytecodePatch(
-    name = "ボーナスチャンネルポイントを自動で受け取る",
+    name = "Auto-claim bonus channel points",
     description = "ライブ配信の視聴中に、ボーナスチャンネルポイントを自動で受け取ります。",
     default = true,
 ) {

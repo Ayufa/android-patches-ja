@@ -298,7 +298,7 @@ internal fun applyPostDetailAuthorActionSkip(
 @Suppress("unused")
 val newXHidePostDetailAuthorActionsPatch =
     bytecodePatch(
-        name = "ポスト作成者のアクションを非表示",
+        name = "NewX: Hide post author actions",
         description = "ポストの詳細で、作成者の「フォロー」と「メッセージ」ボタンを非表示にします。",
     ) {
         unsupportedOnMount()

@@ -43,7 +43,7 @@ private object PollBindingValueFingerprint : Fingerprint(
 @Suppress("unused")
 val newXShowPollResultsPatch =
     bytecodePatch(
-        name = "アンケート結果を表示",
+        name = "NewX: Show poll results",
         description = "投票しなくてもNewXのアンケート結果を表示できるオプションを追加します。",
     ) {
         unsupportedOnMount()

@@ -104,7 +104,7 @@ private data class ResolvedMediaSheetLabel(
 @Suppress("unused")
 val customizeNewXMediaSheetPatch =
     bytecodePatch(
-        name = "メディアメニュー項目をカスタマイズ",
+        name = "NewX: Customize media menu items",
         description = "NewXの写真と動画の長押しメニューで、選んだ項目を非表示にします。",
     ) {
         unsupportedOnMount()

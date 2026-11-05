@@ -14,7 +14,7 @@ import app.morphe.patcher.patch.bytecodePatch
 @Suppress("unused")
 val newXQualityOfLifeFeatureFlagsPatch =
     bytecodePatch(
-        name = "便利な機能フラグを有効化",
+        name = "NewX: Enable quality-of-life feature flags",
         description = "プロフィールの「写真」と「動画」タブや、ポストのスクリーンショット共有を有効にします。",
     ) {
         unsupportedOnMount()

@@ -12,7 +12,7 @@ import app.morphe.patcher.patch.bytecodePatch
 @Suppress("unused")
 val newXHideAdsPatch =
     bytecodePatch(
-        name = "広告を除去",
+        name = "NewX: Remove ads",
         description = "NewXのタイムラインから、プロモーション済みのポストやモジュールを除外します。",
     ) {
         unsupportedOnMount()

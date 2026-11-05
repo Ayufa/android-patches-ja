@@ -45,7 +45,7 @@ private val favoriteEmoteResources = resourcePatch {
 
 @Suppress("unused")
 val favoriteEmotesPatch = bytecodePatch(
-    name = "お気に入りエモート",
+    name = "Favorite emotes",
     description = "エモートピッカーに「お気に入り」セクションを追加します。ピッカーやエモートのカードから追加できます。",
     default = true,
 ) {

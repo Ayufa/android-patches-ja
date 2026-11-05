@@ -59,7 +59,7 @@ private object TurboSignupCallbackFingerprint : Fingerprint(
 
 @Suppress("unused")
 val hideTurboPromotionsPatch = bytecodePatch(
-    name = "Turboのプロモーションを非表示",
+    name = "Hide Turbo promotions",
     description = "Twitch Turboのプロモーションと購入案内を非表示にします。",
     default = true,
 ) {

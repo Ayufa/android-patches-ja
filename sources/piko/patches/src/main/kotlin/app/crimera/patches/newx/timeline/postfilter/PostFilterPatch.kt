@@ -12,7 +12,7 @@ import app.morphe.patcher.patch.bytecodePatch
 @Suppress("unused")
 val postFilterPatch =
     bytecodePatch(
-        name = "キーワードでポストをフィルター",
+        name = "NewX: Filter posts by keyword",
         description = "ユーザーが定義した単語やフレーズで、NewXのポストを除外します。",
     ) {
         unsupportedOnMount()

@@ -96,7 +96,7 @@ private data class ProfileTabSpec(
 @Suppress("unused")
 val customizeNewXProfileTabsPatch =
     bytecodePatch(
-        name = "プロフィールタブをカスタマイズ",
+        name = "NewX: Customize profile tabs",
         description = "プロフィール画面のタブを並べ替えたり非表示にしたりできます。",
     ) {
         unsupportedOnMount()

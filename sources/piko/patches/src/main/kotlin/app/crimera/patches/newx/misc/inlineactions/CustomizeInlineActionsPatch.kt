@@ -36,7 +36,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 @Suppress("unused")
 val customizeNewXInlineActionsPatch =
     bytecodePatch(
-        name = "インラインアクションをカスタマイズ",
+        name = "NewX: Customize inline actions",
         description = "NewXのポストのアクションバーで、選んだ操作を非表示にします。",
     ) {
         unsupportedOnMount()

@@ -160,7 +160,7 @@ private val SERVER_ERROR_CONSTRUCTORS = listOf(
 @Suppress("unused")
 val newXServerLoggingPatch =
     bytecodePatch(
-        name = "サーバーエラーのログ記録",
+        name = "NewX: Server error logging",
         description = "解析したNewXのサーバーエラーをメモリに保持し、必要なときに書き出します。",
         default = false,
     ) {

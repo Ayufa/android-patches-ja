@@ -63,7 +63,7 @@ private val HIDDEN_ID_TO_ENUM_NAMES =
 @Suppress("unused")
 val customizeNewXPostOptionsPatch =
     bytecodePatch(
-        name = "ポストメニュー項目をカスタマイズ",
+        name = "NewX: Customize post menu items",
         description = "NewXのポストメニューで、選んだ項目を非表示にします。",
     ) {
         unsupportedOnMount()

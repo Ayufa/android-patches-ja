@@ -17,7 +17,7 @@ private const val OBJECT_BROWSER_HANDLER = "Lapp/morphe/extension/newx/misc/NewX
 @Suppress("unused")
 val newXBrowseObjectPatch =
     bytecodePatch(
-        name = "ツイートオブジェクトを表示",
+        name = "NewX: Browse tweet object",
         description = "NewXのポストメニューに、ツイートオブジェクトを確認するためのデバッグ項目を追加します。",
         default = false,
     ) {

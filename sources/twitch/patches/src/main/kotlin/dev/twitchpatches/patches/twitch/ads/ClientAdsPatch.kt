@@ -26,7 +26,7 @@ private object DisabledClientAdStateConstructorFingerprint : Fingerprint(
 
 @Suppress("unused")
 val blockClientAdsPatch = bytecodePatch(
-    name = "クライアント要求の広告をブロック",
+    name = "Block client-requested ads",
     description = "プレイヤーからの広告リクエストをブロックします。この設定を変更したらTwitchを再起動してください。",
     default = true,
 ) {

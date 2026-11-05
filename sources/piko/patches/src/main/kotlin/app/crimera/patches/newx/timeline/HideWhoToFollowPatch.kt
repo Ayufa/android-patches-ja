@@ -12,7 +12,7 @@ import app.morphe.patcher.patch.bytecodePatch
 @Suppress("unused")
 val newXHideWhoToFollowPatch =
     bytecodePatch(
-        name = "おすすめユーザーを非表示",
+        name = "NewX: Hide who to follow",
         description = "NewXのタイムラインとプロフィールページから、おすすめユーザーのセクションを取り除きます。",
     ) {
         unsupportedOnMount()

@@ -34,7 +34,7 @@ private object NewXNewPostsPillFingerprint : Fingerprint(
 @Suppress("unused")
 val hideNewPostPillPatch =
     bytecodePatch(
-        name = "新着ポストのピルを非表示",
+        name = "NewX: Hide new posts pill",
         description = "NewXのタイムラインで、新着ポストのピルを非表示にします。",
     ) {
         unsupportedOnMount()

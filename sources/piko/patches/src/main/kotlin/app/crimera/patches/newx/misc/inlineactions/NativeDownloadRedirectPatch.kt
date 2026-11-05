@@ -133,7 +133,7 @@ private data class NativeDownloadHook(
 @Suppress("unused")
 val newXNativeDownloadRedirectPatch =
     bytecodePatch(
-        name = "標準ダウンロードの保存先を変更",
+        name = "NewX: Redirect downloads to chosen folder",
         description = "NewX標準のダウンロードボタンで保存するメディアを、ダウンロード機能で選んだフォルダへ、設定したファイル名テンプレートで保存します。",
     ) {
         unsupportedOnMount()

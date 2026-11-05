@@ -1330,7 +1330,7 @@ private fun replaceDrawerTabOpenerBody(
 @Suppress("unused")
 val customizeNewXDrawerPatch =
     bytecodePatch(
-        name = "ドロワー項目をカスタマイズ",
+        name = "NewX: Customize drawer items",
         description = "NewXのナビゲーションドロワーで選んだ項目を非表示にします。メッセージとGrokのショートカットを任意で追加できます。",
     ) {
         unsupportedOnMount()

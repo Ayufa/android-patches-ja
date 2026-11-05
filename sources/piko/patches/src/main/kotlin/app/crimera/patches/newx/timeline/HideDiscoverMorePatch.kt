@@ -12,7 +12,7 @@ import app.morphe.patcher.patch.bytecodePatch
 @Suppress("unused")
 val newXHideDiscoverMorePatch =
     bytecodePatch(
-        name = "「もっと見る」を非表示",
+        name = "NewX: Hide Discover more",
         description = "ポスト詳細のタイムラインから「もっと見る」セクションを取り除きます。",
     ) {
         unsupportedOnMount()

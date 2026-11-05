@@ -10,7 +10,7 @@ import app.morphe.patcher.patch.bytecodePatch
 @Suppress("unused")
 val newXPermanentShareLinksPatch =
     bytecodePatch(
-        name = "固定の共有リンク",
+        name = "NewX: Permanent share links",
         description = "有効にすると、共有リンクに安定したアカウントIDとポストIDを使います。",
     ) {
         unsupportedOnMount()

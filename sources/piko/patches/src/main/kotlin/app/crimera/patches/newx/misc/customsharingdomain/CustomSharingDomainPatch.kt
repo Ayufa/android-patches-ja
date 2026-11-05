@@ -450,7 +450,7 @@ internal val newXSharedUrlRewritePatch =
 @Suppress("unused")
 val newXCustomSharingDomainPatch =
     bytecodePatch(
-        name = "共有ドメインのカスタマイズ",
+        name = "NewX: Custom sharing domain",
         description = "ポストを共有するときに、fxtwitterなどのドメインを使えるようにします。",
     ) {
         unsupportedOnMount()

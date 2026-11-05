@@ -7,7 +7,7 @@ import java.util.logging.Logger
 
 @Suppress("unused") // Discovered reflectively by Morphe's patch loader.
 val inspectBaselinePatch = bytecodePatch(
-    name = "Twitch APKを検査",
+    name = "Inspect Twitch APK",
     description = "アプリを変更せず、APKのパッケージ、バージョン、DEXクラス数を報告します。",
     default = false,
 ) {

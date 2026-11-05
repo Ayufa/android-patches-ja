@@ -36,7 +36,7 @@ import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 @Suppress("unused")
 val newXHideAiGeneratedPostsPatch =
     bytecodePatch(
-        name = "AI生成ポストを非表示",
+        name = "NewX: Hide AI-generated posts",
         description = "選んだAI生成ポストを、NewXのタイムラインから非表示にします。",
     ) {
         unsupportedOnMount()

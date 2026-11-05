@@ -1674,7 +1674,7 @@ private fun Block.galleryInstructions(
 @Suppress("unused")
 val newXProfilePhotosGalleryPatch =
     bytecodePatch(
-        name = "写真タブのギャラリー表示",
+        name = "NewX: Gallery profile Photos tab",
         description = "プロフィールの「写真」タイムラインを、3列のメディアギャラリーに置き換えます。",
     ) {
         unsupportedOnMount()

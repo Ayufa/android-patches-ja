@@ -206,7 +206,7 @@ private data class ResolvedLottieRenderer(
 @Suppress("unused")
 val dynamicColorPatch =
     bytecodePatch(
-        name = "テーマ",
+        name = "NewX: Theme",
         description = "NewX標準の色、Material You、高コントラスト、Dimの各テーマから選びます。",
     ) {
         unsupportedOnMount()

@@ -72,7 +72,7 @@ private object NewXProfilePostSortingStateFingerprint : Fingerprint(
 @Suppress("unused")
 val newXDefaultProfilePostSortingPatch =
     bytecodePatch(
-        name = "プロフィールのポストのデフォルト並び順",
+        name = "NewX: Set default profile post sorting",
         description = "プロフィールのポストを開いたときの並び順を、新着順か人気順から選べるようにします。",
     ) {
         unsupportedOnMount()

@@ -228,7 +228,7 @@ private data class ResolvedTranslationPath(
 @Suppress("unused")
 val newXTranslatorPatch =
     bytecodePatch(
-        name = "翻訳",
+        name = "NewX: Translator",
         description = "ポストメニューに翻訳の項目を追加します。無料またはカスタムの翻訳サービス（Google、FxTwitter、OpenAI互換、DeepL、LibreTranslate）によるインライン翻訳も選べます。",
     ) {
         unsupportedOnMount()

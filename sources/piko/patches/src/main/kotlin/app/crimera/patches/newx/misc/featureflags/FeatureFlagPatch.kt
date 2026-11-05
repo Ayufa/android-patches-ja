@@ -136,7 +136,7 @@ private val FEATURE_SWITCH_ACCESSORS =
 @Suppress("unused")
 val featureFlagPatch =
     bytecodePatch(
-        name = "機能スイッチの上書き",
+        name = "NewX: Feature switch overrides",
         description = "検索と型指定ができる、NewXの機能スイッチの上書きを追加します。",
     ) {
         unsupportedOnMount()

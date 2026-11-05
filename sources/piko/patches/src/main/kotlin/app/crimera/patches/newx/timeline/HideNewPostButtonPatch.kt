@@ -62,7 +62,7 @@ internal fun Method.isNewPostFabHostCandidate(): Boolean =
 @Suppress("unused")
 val hideNewPostButtonPatch =
     bytecodePatch(
-        name = "作成ボタンを非表示",
+        name = "NewX: Hide compose button",
         description = "NewXのタイムラインから作成ボタンを取り除きます。",
     ) {
         unsupportedOnMount()

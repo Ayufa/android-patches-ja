@@ -7,7 +7,7 @@ import dev.twitchpatches.patches.twitch.shared.*
 
 @Suppress("unused")
 val reloadStreamPatch = bytecodePatch(
-    name = "配信を再読み込み",
+    name = "Reload stream",
     description = "ダブルタップ操作でライブ配信を再読み込みします。",
     default = true,
 ) {

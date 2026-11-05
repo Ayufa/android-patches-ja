@@ -247,7 +247,7 @@ private val restoreTwitterLaunchRevealPatch =
 @Suppress("unused")
 val bringBackTwitterPatch =
     resourcePatch(
-        name = "Twitterブランディングに戻す",
+        name = "NewX: Restore Twitter branding",
         description = "旧Twitterのアイコンとアプリ名を復元します。",
         default = false,
     ) {

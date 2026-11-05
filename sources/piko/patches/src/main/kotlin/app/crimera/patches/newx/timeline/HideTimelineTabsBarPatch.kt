@@ -94,7 +94,7 @@ private object NewXTimelineAddTabButtonFingerprint : Fingerprint(
 @Suppress("unused")
 val newXHideTimelineTabsBarPatch =
     bytecodePatch(
-        name = "タイムラインのタブバーを非表示",
+        name = "NewX: Hide timeline tabs bar",
         description = "NewXのホームタイムラインから「おすすめ」と「フォロー中」のタブバーを取り除きます。タブ追加（+）ボタンを隠すオプションもあります。",
     ) {
         unsupportedOnMount()
