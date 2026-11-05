@@ -78,6 +78,7 @@ v1.1.0〜v1.1.1 では、Morphe の一覧を「アプリごとに1パッチ」�
 統合ビルドでは、本家 Piko のビルドツリー（Morphe Gradle プラグイン 1.3.4 系）へ Twitch 側を注入するため、次の小さな適応をビルドのたびに使い捨てツリー内で行います。保持しているソース自体は変更しません。
 
 - ビルドツリーへコピーした X 側の `patches-list.json`（本家自身の古いもの）を削除する（このビルドで生成した一覧だけを成果物にするため）。
+- 生成された `patches-list.json` の X 分の並びを、本家 piko-newx の公開リストの順序に並べ替える（Morphe Gradle プラグインは名前順で出力するため、そのままだと公開アセットの並びが本家と異なる。パッチャーは実行時に名前順でソートするので動作には無関係で、見た目を本家に合わせるだけの適応。並べ替えは `build_combined.py` の `reorder_patches_list`）。
 - `extensions/twitch/build.gradle.kts` から、プラグイン 2.0.0 系の `extension { name = ... }` ブロックを取り除く（1.3.4 系はモジュールパスから同じ名前 `extensions/twitch.mpe` を導出するため）。
 - `extensions/proguard-rules.pro` に `-keep class dev.twitchpatches.**` を追加する（本家の keep 対象は `app.morphe.**` 等のみで、Twitch 拡張のクラス名参照を守るため）。
 - `patches/build.gradle.kts` の `about` ブロック（バンドル名・説明・配布元・作者・ライセンス）を、このプロジェクトの値に書き換える。

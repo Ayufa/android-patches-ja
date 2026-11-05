@@ -7,9 +7,11 @@ copies (the "clone upstream + translate only" model, v1.2.0+):
 - sources/piko: a copy of upstream crimera/piko (branch ``x-lite``,
   stripped to the NewX patch set) with the Japanese strings applied
   in-tree: the Piko settings UI resources under
-  addresources/values-ja-rJP/ and the NewX patch names/descriptions
-  translated in the patch declarations. The upstream base commit is
-  recorded in sources/piko/UPSTREAM_BASE.md.
+  addresources/values-ja-rJP/ and the NewX patch descriptions
+  translated in the patch declarations (patch names stay upstream
+  English: the patcher executes patches sorted by name, so names are
+  never translated). The upstream base commit is recorded in
+  sources/piko/UPSTREAM_BASE.md.
 - sources/twitch: a translated source copy of ryykitty/twitch-patched.
 
 The build itself adds no patch machinery of its own:
@@ -305,6 +307,109 @@ def twitch_base_version() -> str:
     return "unknown"
 
 
+# The order of upstream crimera/piko-newx's published patches-list.json
+# (v3.73.0). The Morphe Gradle plugin emits the generated list sorted
+# by patch name instead; the generated X entries are reordered to
+# match upstream's published list so the released asset reads the
+# same. This is cosmetic only: the patcher sorts by name at runtime
+# regardless of the list order. Keep in sync with EXPECTED_X_ORDER in
+# scripts/verify_bundle.py.
+UPSTREAM_X_LIST_ORDER = [
+    "NewX: Remove ads",
+    "NewX: Disable blur effects",
+    "NewX: Restore Twitter branding",
+    "NewX: Browse tweet object",
+    "NewX: Open canonical URLs",
+    "NewX: Clone",
+    "NewX: Crash logs",
+    "NewX: Custom font",
+    "NewX: Custom sharing domain",
+    "NewX: Permanent share links",
+    "NewX: Remove share tracking parameters",
+    "NewX: Customize drawer items",
+    "NewX: Theme",
+    "NewX: Feature switch overrides",
+    "NewX: Enable quality-of-life feature flags",
+    "NewX: Customize inline actions",
+    "NewX: Inline download button",
+    "NewX: Redirect downloads to chosen folder",
+    "NewX: Log HLS audio renditions",
+    "NewX: Customize media menu items",
+    "NewX: Set default media tab",
+    "NewX: Gallery profile Photos tab",
+    "NewX: Customize navigation bar",
+    "NewX: Hide post author actions",
+    "NewX: Hide post reply bar",
+    "NewX: Customize post menu items",
+    "NewX: Set default profile post sorting",
+    "NewX: Customize profile tabs",
+    "NewX: Set default reply sorting",
+    "NewX: Server error logging",
+    "NewX: Disable video player scrolling",
+    "NewX: Hide premium upsell",
+    "NewX: Unlock color customization",
+    "NewX: Unlock downloads",
+    "NewX: Customize timeline tabs",
+    "NewX: Disable automatic timeline refresh",
+    "NewX: Filter For You by topic",
+    "NewX: Hide AI-generated posts",
+    "NewX: Hide Discover more",
+    "NewX: Hide compose button",
+    "NewX: Hide new posts pill",
+    "NewX: Hide post dividers",
+    "NewX: Hide Spaces bar",
+    "NewX: Hide timeline tabs bar",
+    "NewX: Hide who to follow",
+    "NewX: Restore pinned home tab",
+    "NewX: Restore timeline position",
+    "NewX: Show poll results",
+    "NewX: Show sensitive media",
+    "NewX: Hide posts by verified account type",
+    "NewX: Filter posts by keyword",
+    "NewX: Translator",
+]
+
+
+def reorder_patches_list(patches_list: Path) -> None:
+    """Reorder the X entries of a generated patches-list.json in place.
+
+    Only the relative order among the X (com.twitter.android) entries
+    changes; every other entry keeps its generated position.
+    """
+
+    def is_x_entry(entry: object) -> bool:
+        if not isinstance(entry, dict):
+            return False
+        compat = entry.get("compatiblePackages") or []
+        if isinstance(compat, dict):
+            packages = list(compat.keys())
+        else:
+            packages = [
+                item.get("packageName") for item in compat if isinstance(item, dict)
+            ]
+        return "com.twitter.android" in packages
+
+    data = json.loads(patches_list.read_text(encoding="utf-8"))
+    entries = data["patches"] if isinstance(data, dict) else data
+    rank = {name: index for index, name in enumerate(UPSTREAM_X_LIST_ORDER)}
+    x_sorted = sorted(
+        (entry for entry in entries if is_x_entry(entry)),
+        key=lambda entry: rank.get(entry["name"], len(rank)),
+    )
+    x_iter = iter(x_sorted)
+    reordered = [next(x_iter) if is_x_entry(entry) else entry for entry in entries]
+    if reordered == entries:
+        return
+    if isinstance(data, dict):
+        data["patches"] = reordered
+    else:
+        data = reordered
+    patches_list.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print("Reordered X patches in the patches list to upstream's published order")
+
+
 @dataclass
 class CombinedBuild:
     piko_commit: str
@@ -374,6 +479,7 @@ def build_combined(
                 generated = max(candidates, key=lambda c: c.stat().st_mtime)
                 patches_list = output_path.parent / "patches-list.json"
                 shutil.copy2(generated, patches_list)
+                reorder_patches_list(patches_list)
                 print(f"Generated patches list: {patches_list}")
             else:
                 print("generatePatchesList produced no fresh patches-list.json")
