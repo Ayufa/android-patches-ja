@@ -1,0 +1,7 @@
+{
+  "created_at": "2026-11-05T05:41:58",
+  "description": "X (NewX) パッチと Twitch パッチを1つの `.mpp` にまとめた日本語化バンドル `patches-1.0.0.mpp` をリリースします。\n\n## 収録パッチ\n\n- X (NewX): 52 パッチ（対応 X バージョン: 12.38.1-prod.01、12.39.0-prod.01）\n- Twitch: 13 パッチ（対応 Twitch バージョン: 31.8.0 安定版 / 31.9.0_BETA 実験的対応）\n\n## 日本語化\n\n- Piko 設定 UI の日本語訳 486 件（リソースオーバーレイ）\n- Twitch 側はパッチ名・説明とパッチ設定 UI をソース直接翻訳\n\n## ビルド情報\n\n- Piko (crimera/piko x-lite): 340dd024aa889a5e116550039eafceeb45a85107\n- Twitch (ryykitty/twitch-patched) ベース: v1.5.1\n- Patcher-Version: 2.0.0\n\nMorphe への追加: https://morphe.software/add-source?github=Ayufa/android-patches-ja\n",
+  "download_url": "https://github.com/Ayufa/android-patches-ja/releases/download/v1.0.0/patches-1.0.0.mpp",
+  "signature_download_url": "",
+  "version": "1.0.0"
+}
