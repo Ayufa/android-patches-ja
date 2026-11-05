@@ -1,4 +1,4 @@
-# 日本語化の方針と範囲（android-patches-ja）
+# 日本語化の方針と範囲（ayufa-patches-ja）
 
 両側とも「本家をクローンし、言語だけを日本語にする」方式で、翻訳済みソースのコピーを保持します（X 側: `sources/piko/`、Twitch 側: `sources/twitch/`）。
 

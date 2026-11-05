@@ -1,10 +1,10 @@
-<p align="center">
-  <a href="https://morphe.software/add-source?github=Ayufa/android-patches-ja">
+# ayufa-patches-ja（Ayufa Patches JA）
+  <a href="https://morphe.software/add-source?github=Ayufa/ayufa-patches-ja">
     <img src="assets/add-to-morphe.svg" alt="Add to Morphe" height="48">
   </a>
 </p>
 
-# android-patches-ja（Android Patches JA）
+# ayufa-patches-ja（Ayufa Patches JA）
 
 X（旧Twitter）と Twitch の [Morphe](https://morphe.software/) パッチを **1つのパッチバンドル（`.mpp`）にまとめた、非公式の日本語化バンドル** です。
 
@@ -31,7 +31,7 @@ Morphe Patcher 2.0.0 以上が必要です。再署名したアプリでは Goog
 1. 上のボタンから Morphe にこのリポジトリをパッチソースとして追加します。
 2. 対応バージョンの X または Twitch 公式APKを選び、使いたいパッチを選択して適用・インストールします。
 
-[Releases](https://github.com/Ayufa/android-patches-ja/releases) に `.mpp` パッチバンドル（`patches-<バージョン>.mpp`）と `patches-list.json`（収録パッチ一覧）が含まれます。端末／アプリの言語が日本語の場合に、日本語化した部分が日本語で表示されます。
+[Releases](https://github.com/Ayufa/ayufa-patches-ja/releases) に `.mpp` パッチバンドル（`patches-<バージョン>.mpp`）と `patches-list.json`（収録パッチ一覧）が含まれます。端末／アプリの言語が日本語の場合に、日本語化した部分が日本語で表示されます。
 
 ## 仕組み
 
