@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the combined Ayufa Patches JP bundle (one .mpp).
 
-Both patch sets are kept in this repository as translated source
+All three patch sets are kept in this repository as translated source
 copies (the "clone upstream + translate only" model, v1.2.0+):
 
 - sources/piko: a copy of upstream crimera/piko (branch ``x-lite``,
@@ -13,6 +13,11 @@ copies (the "clone upstream + translate only" model, v1.2.0+):
   never translated). The upstream base commit is recorded in
   sources/piko/UPSTREAM_BASE.md.
 - sources/twitch: a translated source copy of ryykitty/twitch-patched.
+- sources/line: a translated source copy of
+  andrewliang25/morphe-patches. The copy keeps upstream's full tree,
+  but only the LINE patch set is injected; the Facebook patch sources
+  stay out of the bundle. The upstream base commit is recorded in
+  sources/line/UPSTREAM_BASE.md.
 
 The build itself adds no patch machinery of its own:
 
@@ -23,9 +28,11 @@ The build itself adds no patch machinery of its own:
 3. Inject the Twitch patch set from sources/twitch: patch sources,
    patch resources (reactnative/, hermes/), the extensions/twitch
    module and the shared/ivs-api compile-only sources it needs.
-4. Rewrite the bundle metadata (name/description/source/author) in
+4. Inject the LINE patch set from sources/line: the LINE and shared
+   patch sources and the extensions/extension module.
+5. Rewrite the bundle metadata (name/description/source/author) in
    the temporary tree and set the bundle version.
-5. Run ``./gradlew clean buildAndroid`` and copy out
+6. Run ``./gradlew clean buildAndroid`` and copy out
    patches-<version>.mpp. A patches list is generated afterwards on a
    best-effort basis for verification/release metadata; the release
    workflow fails if the list is missing (v1.1.0 shipped without one).
@@ -63,11 +70,16 @@ ADDRESOURCES_DIR = "patches/src/main/resources/addresources"
 # tree hosted by the Piko copy.
 TWITCH_SOURCES = REPO_ROOT / "sources" / "twitch"
 
+# LINE side: translated source copy of andrewliang25/morphe-patches
+# kept in this repository (see docs/UPSTREAM.md). Only its LINE patch
+# set is injected into the build tree; the Facebook patches are not.
+LINE_SOURCES = REPO_ROOT / "sources" / "line"
+
 # Combined bundle metadata written into the temporary tree's
 # patches/build.gradle.kts about block (ends up in the .mpp MANIFEST).
 BUNDLE_NAME = "Ayufa Patches JP"
 BUNDLE_DESCRIPTION = (
-    "X (NewX) と Twitch の Morphe パッチを1つにまとめた日本語化バンドル"
+    "X (NewX)・Twitch・LINE の Morphe パッチを1つにまとめた日本語化バンドル"
 )
 BUNDLE_SOURCE = "https://github.com/Ayufa/ayufa-patches-jp"
 BUNDLE_AUTHOR = "Ayufa"
@@ -172,23 +184,38 @@ def _strip_extension_dsl(build_file: Path) -> None:
             f"Expected exactly one extension block in {build_file}, removed {removed}"
         )
     build_file.write_text("".join(kept), encoding="utf-8")
-    print("Adapted extensions/twitch/build.gradle.kts: removed extension {} block")
+    print(f"Adapted {build_file}: removed extension {{}} block")
+
+
+# Packages of the injected extensions whose classes are referenced
+# from patches by class-name strings and therefore need an explicit
+# keep in the extension R8 step.
+_PROGUARD_KEEPS = (
+    "dev.twitchpatches",
+    "app.andrewliang",
+)
 
 
 def _append_proguard_keep(piko_directory: Path) -> None:
-    """Keep the Twitch extension classes in the extension R8 step.
+    """Keep the injected extension classes in the extension R8 step.
 
     The Piko tree's extensions/proguard-rules.pro only keeps
     app.morphe.**, app.revanced.** and com.google.**. The Twitch
-    extension lives in dev.twitchpatches.** and is referenced from
-    patches by class-name strings, so it needs an explicit keep.
+    extension lives in dev.twitchpatches.** and the LINE extension in
+    app.andrewliang.**, so both need an explicit keep. Idempotent:
+    each keep is appended only when its package is not mentioned yet.
     """
     rules = piko_directory / "extensions" / "proguard-rules.pro"
     text = rules.read_text(encoding="utf-8")
-    keep = "-keep class dev.twitchpatches.** {\n  *;\n}\n"
-    if "dev.twitchpatches" not in text:
-        rules.write_text(text.rstrip("\n") + "\n\n" + keep, encoding="utf-8")
-    print("Adapted extensions/proguard-rules.pro: keep dev.twitchpatches.**")
+    for package in _PROGUARD_KEEPS:
+        if package not in text:
+            keep = f"-keep class {package}.** {{\n  *;\n}}\n"
+            text = text.rstrip("\n") + "\n\n" + keep
+    rules.write_text(text, encoding="utf-8")
+    print(
+        "Adapted extensions/proguard-rules.pro: keep "
+        + " and ".join(f"{package}.**" for package in _PROGUARD_KEEPS)
+    )
 
 
 def _rewrite_about_block(piko_directory: Path) -> None:
@@ -279,6 +306,34 @@ def inject_twitch_sources(piko_directory: Path) -> None:
     _rewrite_about_block(piko_directory)
 
 
+def inject_line_sources(piko_directory: Path) -> None:
+    """Copy the LINE patch set from sources/line into the build tree.
+
+    Only the LINE patches enter the bundle. The source copy keeps
+    upstream's full tree, but the Facebook patch sources and
+    upstream's release tooling (patches/src/main/kotlin/util/, its
+    own generatePatchesList) are not injected. The shared subtree
+    carries the LINE compatibility definition and the resource-id
+    resolver the LINE patches depend on; the LINE settings UI lives
+    in the extensions/extension module.
+    """
+    patches_kotlin = LINE_SOURCES / "patches" / "src" / "main" / "kotlin"
+    build_kotlin = piko_directory / "patches" / "src" / "main" / "kotlin"
+    for subtree in ("line", "shared"):
+        _copy_tree(
+            patches_kotlin / "app" / "andrewliang" / "patches" / subtree,
+            build_kotlin / "app" / "andrewliang" / "patches" / subtree,
+        )
+    _copy_tree(
+        LINE_SOURCES / "extensions" / "extension",
+        piko_directory / "extensions" / "extension",
+    )
+    _strip_extension_dsl(
+        piko_directory / "extensions" / "extension" / "build.gradle.kts"
+    )
+    _append_proguard_keep(piko_directory)
+
+
 def set_project_version(piko_directory: Path, version: str) -> None:
     """Set the version only in the temporary Piko tree used for a build."""
     properties_path = piko_directory / "gradle.properties"
@@ -298,6 +353,18 @@ def set_project_version(piko_directory: Path, version: str) -> None:
 def twitch_base_version() -> str:
     """Version of the upstream twitch-patched release the copy is based on."""
     changelog = TWITCH_SOURCES / "CHANGELOG.md"
+    if changelog.is_file():
+        match = re.search(
+            r"\[(\d+\.\d+\.\d+)\]", changelog.read_text(encoding="utf-8")
+        )
+        if match:
+            return match.group(1)
+    return "unknown"
+
+
+def line_base_version() -> str:
+    """Version of the upstream morphe-patches release the copy is based on."""
+    changelog = LINE_SOURCES / "CHANGELOG.md"
     if changelog.is_file():
         match = re.search(
             r"\[(\d+\.\d+\.\d+)\]", changelog.read_text(encoding="utf-8")
@@ -415,6 +482,7 @@ class CombinedBuild:
     piko_commit: str
     supported_versions: frozenset[str]
     twitch_base: str
+    line_base: str
     patches_list: Path | None = field(default=None)
 
 
@@ -439,6 +507,7 @@ def build_combined(
         prepare_build_tree(piko_directory)
         report_translation_coverage(piko_directory)
         inject_twitch_sources(piko_directory)
+        inject_line_sources(piko_directory)
         set_project_version(piko_directory, bundle_version)
 
         subprocess.run(
@@ -490,6 +559,7 @@ def build_combined(
         piko_commit=base_commit,
         supported_versions=supported_versions,
         twitch_base=twitch_base_version(),
+        line_base=line_base_version(),
         patches_list=patches_list,
     )
 
@@ -528,6 +598,7 @@ def main() -> None:
         "piko_source": "sources/piko (translated source copy)",
         "x_supported_versions": sorted(result.supported_versions),
         "twitch_base_version": result.twitch_base,
+        "line_base_version": result.line_base,
         "patches_list_generated": result.patches_list is not None,
     }
     metadata_path.write_text(

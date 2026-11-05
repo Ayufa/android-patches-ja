@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Verify a combined Ayufa Patches JP bundle (.mpp).
 
-Checks that the single bundle really contains both patch sets:
+Checks that the single bundle really contains all three patch sets:
 
-- bundle structure: patch classes dex plus all three extension
-  payloads (newx, shared, twitch) and both resource sets
+- bundle structure: patch classes dex plus all four extension
+  payloads (newx, shared, twitch, extension) and both resource sets
   (addresources with the Japanese settings resources, reactnative/,
   hermes/).
 - MANIFEST metadata points at this project and carries a
@@ -14,8 +14,9 @@ Checks that the single bundle really contains both patch sets:
 - patch inventory: since v1.2.0 the bundle ships upstream's patches
   individually again (no umbrella patches). When a patches-list.json
   from the build is given, it must contain exactly the patches of the
-  two source copies -- 52 for X (com.twitter.android) and 13 for
-  Twitch (tv.twitch.android.app). Since v1.2.1 the patch NAMES are
+  three source copies -- 52 for X (com.twitter.android), 14 for
+  Twitch (tv.twitch.android.app; upstream 13 plus one Ayufa original)
+  and 32 for LINE (jp.naver.line.android). Since v1.2.1 the patch NAMES are
   upstream's English names, never translated: the Morphe patcher
   executes patches sorted by name, so translated names changed the
   execution order versus upstream and broke patches on device (see
@@ -40,10 +41,12 @@ EXPECTED_EXTENSIONS = {
     "extensions/newx.mpe",
     "extensions/shared.mpe",
     "extensions/twitch.mpe",
+    "extensions/extension.mpe",
 }
 JA_STRINGS_ENTRY = "addresources/values-ja-rJP/newx/strings.xml"
-# The full listed patch inventory of the two source copies
-# (sources/piko @ 340dd02, sources/twitch @ v1.5.0 base). Patch names
+# The full listed patch inventory of the three source copies
+# (sources/piko @ 340dd02, sources/twitch @ v1.5.0 base,
+# sources/line @ v3.10.0 base). Patch names
 # are upstream's English names and are NEVER translated (the patcher
 # sorts execution by name; see docs/UPSTREAM.md). The X list is kept
 # in the exact order of upstream crimera/piko-newx v3.73.0's
@@ -121,6 +124,43 @@ EXPECTED_PATCHES = {
         # Its name is English by the same never-translate rule.
         "Ayufa: Startup tab",
     },
+    # LINE patches from andrewliang25/morphe-patches (v3.10.0 base).
+    # Only the LINE set is bundled; upstream's Facebook patches are
+    # not injected into the build (see docs/UPSTREAM.md).
+    "jp.naver.line.android": {
+        "[General] Trust user-installed CAs",
+        "[Chat] Hide AI Friends button",
+        "[Chat] Hide community button",
+        "[General] Custom font",
+        "[General] Redirect LINE Pay",
+        "[General] Disable VOOM",
+        "[General] Open links in external browser",
+        "[Fix] Restore biometric login",
+        "[Fix] Restore location maps via MicroG-RE",
+        "[Fix] Restore push notifications",
+        "[Fix] Restore chat backup sign-in via MicroG-RE",
+        "[Ad] Hide ad views",
+        "[General] Hide Agent i buttons",
+        "[Chat] Hide attach menu extra tools",
+        "[Chat] Hide calendar buttons",
+        "[Chat] Hide tips under messages",
+        "[Chat] Hide Events button",
+        "[Chat] Hide LINE GIFT button",
+        "[Home] Hide Home content feed",
+        "[Home] Hide Home modules",
+        "[Tab] Hide LINE TODAY tab",
+        "[General] Hide new item badges",
+        "[Premium] Disable LINE Premium",
+        "[Premium] Hide premium unsend upsells",
+        "[Tab] Hide Shopping tab",
+        "[Chat] Hide Transfer button",
+        "[Tab] Hide VOOM tab",
+        "[Tab] Hide Wallet tab",
+        "[Chat] Keep chats unread",
+        "[Chat] Keep unsent messages",
+        "[Ad] Remove banner ads",
+        "[General] Andrew's Patch Setting",
+    },
 }
 # Upstream crimera/piko-newx v3.73.0's published patches-list.json
 # order for X (the generated list must keep this order).
@@ -179,17 +219,21 @@ EXPECTED_X_ORDER = [
     "NewX: Translator",
 ]
 EXPECTED_LISTED_COUNT = sum(len(names) for names in EXPECTED_PATCHES.values())
-# Code markers proving both patch sets survived in classes.dex, plus
-# the settings key of a settings-gated opt-in NewX patch (Hide post
-# dividers).
+# Code markers proving all three patch sets survived in classes.dex,
+# plus the settings key of a settings-gated opt-in NewX patch (Hide
+# post dividers).
 DEX_CODE_MARKERS = [
     b"app/crimera/patches/newx",
     b"dev/twitchpatches/patches",
+    b"app/andrewliang/patches",
     b"newx.timeline.hide_post_dividers",
 ]
 # The Twitch settings screen title must be inside the Twitch extension
 # payload (the feature toggles live there at runtime).
 TWITCH_EXTENSION_MARKER = "パッチ設定"
+# A LINE settings switch label must be inside the LINE extension
+# payload (the "Andrew's Patch Setting" screen lives there at runtime).
+LINE_EXTENSION_MARKER = "トークを未読のままにする"
 
 
 def fail(message: str, failures: list[str]) -> None:
@@ -270,6 +314,11 @@ def main() -> int:
             if "extensions/twitch.mpe" in names
             else b""
         )
+        line_ext = (
+            archive.read("extensions/extension.mpe")
+            if "extensions/extension.mpe" in names
+            else b""
+        )
 
         rn_assets = [n for n in names if n.startswith("reactnative/") and n.endswith(".js")]
         if len(rn_assets) >= 20:
@@ -327,6 +376,10 @@ def main() -> int:
         ok("Twitch extension contains the パッチ設定 screen strings")
     else:
         fail("Twitch extension lacks パッチ設定 strings", failures)
+    if LINE_EXTENSION_MARKER.encode("utf-8") in line_ext:
+        ok("LINE extension contains the translated settings screen strings")
+    else:
+        fail("LINE extension lacks translated settings screen strings", failures)
 
     listed: list[dict] = []
     if args.patches_list:
@@ -338,7 +391,8 @@ def main() -> int:
                 f"patches list contains {len(listed)} patches, "
                 f"expected exactly {EXPECTED_LISTED_COUNT} "
                 f"(X {len(EXPECTED_PATCHES['com.twitter.android'])} + "
-                f"Twitch {len(EXPECTED_PATCHES['tv.twitch.android.app'])})",
+                f"Twitch {len(EXPECTED_PATCHES['tv.twitch.android.app'])} + "
+                f"LINE {len(EXPECTED_PATCHES['jp.naver.line.android'])})",
                 failures,
             )
         seen: set[tuple[str, str]] = set()
@@ -407,6 +461,9 @@ def main() -> int:
     summary["twitch_patch_count"] = sum(
         1 for p in listed if "tv.twitch.android.app" in p["packages"]
     )
+    summary["line_patch_count"] = sum(
+        1 for p in listed if "jp.naver.line.android" in p["packages"]
+    )
 
     summary_path = (
         Path(args.summary)
@@ -420,7 +477,8 @@ def main() -> int:
     print(f"summary written: {summary_path}")
     print(
         f"patches: NewX (X) = {summary['newx_patch_count']}, "
-        f"Twitch = {summary['twitch_patch_count']}"
+        f"Twitch = {summary['twitch_patch_count']}, "
+        f"LINE = {summary['line_patch_count']}"
     )
 
     if failures:

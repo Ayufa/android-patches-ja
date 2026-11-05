@@ -19,12 +19,13 @@ def main() -> None:
     version = metadata["version"]
     x_versions = "、".join(metadata.get("x_supported_versions", []))
     lines = [
-        f"X (NewX) パッチと Twitch パッチを1つの `.mpp` にまとめた"
+        f"X (NewX) パッチと Twitch パッチ、LINE パッチを1つの `.mpp` にまとめた"
         f"日本語化バンドル `patches-{version}.mpp` をリリースします。",
         "",
         "## 収録パッチ",
         "",
-        "本家（crimera/piko の NewX と ryykitty/twitch-patched）のパッチを、"
+        "本家（crimera/piko の NewX、ryykitty/twitch-patched、"
+        "andrewliang25/morphe-patches の LINE パッチ）のパッチを、"
         "翻訳済みソースのコピーからそのまま収録しています。"
         "Morphe のパッチ一覧では機能ごとに選択できます。",
         "",
@@ -32,6 +33,8 @@ def main() -> None:
         f"（対応 X バージョン: {x_versions}）",
         f"- Twitch: パッチ {summary.get('twitch_patch_count')} 件"
         "（対応 Twitch バージョン: 31.8.0 安定版 / 31.9.0_BETA 実験的対応）",
+        f"- LINE: パッチ {summary.get('line_patch_count')} 件"
+        "（対応 LINE バージョン: 26.14.0 / 26.15.1 / 26.16.0）",
         "",
     ]
     if version == "1.2.1":
@@ -85,17 +88,21 @@ def main() -> None:
         "",
         f"- Piko 設定 UI の日本語訳 {summary.get('ja_overlay_strings')} 件"
         "（X 側ソースコピー内の日本語リソース）",
-        "- パッチの説明（Morphe の一覧）は両アプリとも日本語。"
+        "- パッチの説明（Morphe の一覧）は3アプリとも日本語。"
         "パッチ名は本家の英語名のままです（パッチャーが名前順に実行する"
         "ため、実行順序を本家と一致させる恒久ルール）。"
         "設定キーやブランド名、内部エラー・ログも英語のまま",
         "- Twitch 側はパッチの説明とパッチ設定 UI などをソース直接翻訳",
+        "- LINE 側はパッチの説明と Andrew's Patch Setting の設定 UI を"
+        "ソース直接翻訳",
         "",
         "## ビルド情報",
         "",
         f"- Piko (crimera/piko x-lite) ベース: {metadata.get('piko_commit')}",
         f"- Twitch (ryykitty/twitch-patched) ベース: "
         f"v{metadata.get('twitch_base_version')}",
+        f"- LINE (andrewliang25/morphe-patches) ベース: "
+        f"v{metadata.get('line_base_version')}",
         f"- Patcher-Version: {summary.get('manifest', {}).get('Patcher-Version')}",
         "",
         "Morphe への追加: https://morphe.software/add-source?github=Ayufa/ayufa-patches-jp",
