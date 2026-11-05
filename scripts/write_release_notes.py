@@ -18,56 +18,60 @@ def main() -> None:
 
     version = metadata["version"]
     x_versions = "、".join(metadata.get("x_supported_versions", []))
-    one_patch = metadata.get("one_patch_per_app") or {}
-    x_info = one_patch.get("x") or {}
-    twitch_info = one_patch.get("twitch") or {}
     lines = [
         f"X (NewX) パッチと Twitch パッチを1つの `.mpp` にまとめた"
         f"日本語化バンドル `patches-{version}.mpp` をリリースします。",
         "",
-        "## 収録パッチ（アプリごとに1つ）",
+        "## 収録パッチ",
         "",
-        "v1.1.0 から、Morphe のパッチ一覧には機能ごとの細かいパッチではなく、"
-        "アプリ単位の統合パッチだけが表示されます。"
-        "個別機能のオン・オフは、適用後のアプリ内設定画面"
-        "（X は NewX 設定、Twitch は「パッチ設定」）で行います。",
+        "本家（crimera/piko の NewX と ryykitty/twitch-patched）のパッチを、"
+        "翻訳済みソースのコピーからそのまま収録しています。"
+        "Morphe のパッチ一覧では機能ごとに選択できます。",
         "",
-        f"- X: 「X（NewX）日本語化パッチ」"
-        f"（NewX の機能パッチ {x_info.get('included')} 件を内包。"
-        f"対応 X バージョン: {x_versions}）",
-        f"- X（マウント用）: 「X（NewX）日本語化パッチ（マウント用）」"
-        f"（マウントインストールで使える機能パッチ {x_info.get('mount_included')} 件のみ。"
-        "マウントでは設定画面など標準インストールが必要な機能が使えないため、"
-        "X のみマウント用が別にあります。通常のインストールでは使いません）",
-        f"- Twitch: 「Twitch 日本語化パッチ」1件"
-        f"（Twitch の機能パッチ {twitch_info.get('included')} 件を内包。"
-        "対応 Twitch バージョン: 31.8.0 安定版 / 31.9.0_BETA 実験的対応）",
+        f"- X: NewX のパッチ {summary.get('newx_patch_count')} 件"
+        f"（対応 X バージョン: {x_versions}）",
+        f"- Twitch: パッチ {summary.get('twitch_patch_count')} 件"
+        "（対応 Twitch バージョン: 31.8.0 安定版 / 31.9.0_BETA 実験的対応）",
         "",
-        "### 統合に含まれない機能（v1.0.0 では任意選択だったもの）",
-        "",
-        "次の4機能は、アプリ内設定で無効化できず、全員へ一律適用すると"
-        "アプリの見た目や動作が変わってしまうため、統合パッチには含めていません"
-        "（コード自体はバンドル内に残りますが実行されません）。",
-        "",
-        "- NewX: Clone（パッケージ名／アプリ名の変更）",
-        "- NewX: Restore Twitter branding（旧 Twitter ブランディングへの置き換え）",
-        "- NewX: Log HLS audio renditions（診断ログ。オフにする設定なし）",
-        "- Twitch: 再生の診断（再生トレース。オフにする設定なし）",
-        "",
-        "逆に、従来は任意選択だった NewX の「Hide post dividers」"
-        "「Browse tweet object」「Server error logging」と "
-        "Twitch の「Twitch APKを検査」は、設定で切り替えできる"
-        "（またはアプリを変更しない）ため統合パッチに含めました。",
-        "",
+    ]
+    if version == "1.2.0":
+        lines += [
+            "## v1.2.0 の変更（構成の見直し）",
+            "",
+            "- **構成を「機能ごとのパッチ」に戻しました。** v1.1.x ではアプリ単位の"
+            "統合パッチ（傘パッチ）として表示していましたが、その方式では、"
+            "内包する機能パッチが1つでも失敗すると残り全部が適用されませんでした。"
+            "v1.2.0 からは本家のパッチを個別に収録する方式に戻し、失敗しても"
+            "そのパッチだけの問題で済み、Morphe で個別に外すこともできます。",
+            "- **X 側のパッチ名と説明が日本語になりました。** これまでは Piko 設定 UI の"
+            "文字列だけが日本語で、Morphe の一覧のパッチ名・説明は英語でした。"
+            "X 側も Twitch 側と同じく、翻訳済みソースのコピーを保持する方式に"
+            "統一したため、一覧の名前と説明（全52件）も日本語になっています。",
+            "- **v1.1.x の統合パッチに含まれなかった4機能が、通常のパッチとして"
+            "戻りました。** NewX の「クローン」「Twitterブランディングに戻す」"
+            "「HLS音声レンディションのログ」と、Twitch の「再生の診断」です。"
+            "いずれも本家の初期状態（任意選択・初期値オフ）のまま、個別に選べます。",
+            "- **既知の問題: 「正規URLを直接開く」（本家 CanonicalUrls）は、"
+            "X 12.39.0-prod.01 では本家側の都合で失敗します。** 本家が 12.39.0-prod.01 対応を"
+            "宣言した変更は対応バージョンの追加のみで、この機能の照合は"
+            "12.39.0-alpha.03 まででしか検証されていません。v1.2.0 の方式では"
+            "このパッチだけが失敗するので、12.39.0-prod.01 では Morphe で"
+            "このパッチを外して適用してください（他のパッチはそのまま使えます）。"
+            "本家に修正が入れば、日次同期で取り込んで新しい版を出します。",
+            "",
+        ]
+    lines += [
         "## 日本語化",
         "",
         f"- Piko 設定 UI の日本語訳 {summary.get('ja_overlay_strings')} 件"
-        "（リソースオーバーレイ）",
-        "- Twitch 側はパッチ設定 UI などをソース直接翻訳",
+        "（X 側ソースコピー内の日本語リソース）",
+        "- X 側のパッチ名・説明（Morphe の一覧）も日本語"
+        "（設定キーやブランド名、内部エラー・ログは英語のまま）",
+        "- Twitch 側はパッチ名・説明とパッチ設定 UI などをソース直接翻訳",
         "",
         "## ビルド情報",
         "",
-        f"- Piko (crimera/piko x-lite): {metadata.get('piko_commit')}",
+        f"- Piko (crimera/piko x-lite) ベース: {metadata.get('piko_commit')}",
         f"- Twitch (ryykitty/twitch-patched) ベース: "
         f"v{metadata.get('twitch_base_version')}",
         f"- Patcher-Version: {summary.get('manifest', {}).get('Patcher-Version')}",

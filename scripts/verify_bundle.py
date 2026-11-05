@@ -5,18 +5,20 @@ Checks that the single bundle really contains both patch sets:
 
 - bundle structure: patch classes dex plus all three extension
   payloads (newx, shared, twitch) and both resource sets
-  (addresources with the Japanese overlay, reactnative/, hermes/).
+  (addresources with the Japanese settings resources, reactnative/,
+  hermes/).
 - MANIFEST metadata points at this project and carries a
   Patcher-Version.
-- the Japanese overlay holds the full Piko settings translation.
-- patch inventory: the bundle lists only umbrella patches (v1.1.0+
-  structure): two for X (standard-install and mount-install) and one
-  for Twitch. When a patches-list.json from the build is given, it
-  must contain exactly those patches for com.twitter.android /
-  tv.twitch.android.app, and the names must be present in
-  classes.dex. The feature patch code of both sets (which is no
-  longer listed individually) is checked via code markers in
-  classes.dex and the extension payloads.
+- the Japanese settings resources hold the full Piko settings
+  translation.
+- patch inventory: since v1.2.0 the bundle ships upstream's patches
+  individually again (no umbrella patches). When a patches-list.json
+  from the build is given, it must contain exactly the patches of the
+  two source copies -- 52 for X (com.twitter.android) and 13 for
+  Twitch (tv.twitch.android.app) -- with the Japanese names below,
+  and every listed name must be present in classes.dex. When upstream
+  adds/removes/renames a patch, update EXPECTED_PATCHES together with
+  the source copies (see docs/UPSTREAM.md).
 
 Writes a bundle-summary.json next to the bundle and exits non-zero
 when any check fails.
@@ -35,22 +37,84 @@ EXPECTED_EXTENSIONS = {
     "extensions/twitch.mpe",
 }
 JA_STRINGS_ENTRY = "addresources/values-ja-rJP/newx/strings.xml"
-# The umbrella patches are the only listed patches since v1.1.0.
-# X has two: the standard-install umbrella (full feature set) and the
-# mount-install umbrella (the mount-compatible subset upstream keeps
-# available on mount installs). Twitch has one.
-UMBRELLA_PATCHES = {
+# The full listed patch inventory of the two source copies
+# (sources/piko @ 340dd02, sources/twitch @ v1.5.0 base), with the
+# Japanese patch names as translated in the copies.
+EXPECTED_PATCHES = {
     "com.twitter.android": {
-        "X（NewX）日本語化パッチ",
-        "X（NewX）日本語化パッチ（マウント用）",
+        "広告を除去",
+        "ぼかし効果を無効化",
+        "Twitterブランディングに戻す",
+        "ツイートオブジェクトを表示",
+        "正規URLを直接開く",
+        "クローン",
+        "クラッシュログ",
+        "カスタムフォント",
+        "共有ドメインのカスタマイズ",
+        "固定の共有リンク",
+        "共有リンクのトラッキング除去",
+        "ドロワー項目をカスタマイズ",
+        "テーマ",
+        "機能スイッチの上書き",
+        "便利な機能フラグを有効化",
+        "インラインアクションをカスタマイズ",
+        "インラインダウンロードボタン",
+        "標準ダウンロードの保存先を変更",
+        "HLS音声レンディションのログ",
+        "メディアメニュー項目をカスタマイズ",
+        "メディアタブのデフォルト",
+        "写真タブのギャラリー表示",
+        "ナビゲーションバーをカスタマイズ",
+        "ポスト作成者のアクションを非表示",
+        "ポストの返信バーを非表示",
+        "ポストメニュー項目をカスタマイズ",
+        "プロフィールのポストのデフォルト並び順",
+        "プロフィールタブをカスタマイズ",
+        "返信のデフォルト並び順",
+        "サーバーエラーのログ記録",
+        "動画プレーヤーのスクロールを無効化",
+        "プレミアムのアップセルを非表示",
+        "色のカスタマイズを解放",
+        "ダウンロードを解放",
+        "タイムラインタブをカスタマイズ",
+        "タイムラインの自動更新を無効化",
+        "おすすめのトピックフィルター",
+        "AI生成ポストを非表示",
+        "「もっと見る」を非表示",
+        "作成ボタンを非表示",
+        "新着ポストのピルを非表示",
+        "ポストの区切り線を非表示",
+        "スペースバーを非表示",
+        "タイムラインのタブバーを非表示",
+        "おすすめユーザーを非表示",
+        "ピン留めしたタブを再度開く",
+        "タイムラインの位置を復元",
+        "アンケート結果を表示",
+        "センシティブなメディアを表示",
+        "認証タイプでポストを非表示",
+        "キーワードでポストをフィルター",
+        "翻訳",
     },
-    "tv.twitch.android.app": {"Twitch 日本語化パッチ"},
+    "tv.twitch.android.app": {
+        "クライアント要求の広告をブロック",
+        "フィードとディスプレイ広告を非表示",
+        "配信中の広告をブロック",
+        "ボーナスチャンネルポイントを自動で受け取る",
+        "削除されたメッセージを表示",
+        "Twitch APKを検査",
+        "再生の診断",
+        "お気に入りエモート",
+        "BTTV、FFZ、7TVのエモート",
+        "サブスク割引バナーを非表示",
+        "Turboのプロモーションを非表示",
+        "配信を再読み込み",
+        "UI設定",
+    },
 }
-EXPECTED_LISTED_COUNT = sum(len(names) for names in UMBRELLA_PATCHES.values())
-# Code markers proving both feature patch sets survived in classes.dex
-# even though the feature patches are no longer listed by name: class
-# descriptor prefixes of both sets, plus the settings key of a
-# settings-gated opt-in NewX patch (Hide post dividers).
+EXPECTED_LISTED_COUNT = sum(len(names) for names in EXPECTED_PATCHES.values())
+# Code markers proving both patch sets survived in classes.dex, plus
+# the settings key of a settings-gated opt-in NewX patch (Hide post
+# dividers).
 DEX_CODE_MARKERS = [
     b"app/crimera/patches/newx",
     b"dev/twitchpatches/patches",
@@ -150,14 +214,14 @@ def main() -> int:
             ja_xml = archive.read(JA_STRINGS_ENTRY).decode("utf-8")
             string_count = len(re.findall(r"<string\s+name=", ja_xml))
             if string_count >= 400:
-                ok(f"Japanese overlay present: {string_count} strings")
+                ok(f"Japanese settings resources present: {string_count} strings")
             else:
-                fail(f"Japanese overlay too small: {string_count} strings", failures)
+                fail(f"Japanese settings resources too small: {string_count} strings", failures)
             if not re.search(r"[\u3040-\u30ff]", ja_xml):
-                fail("Japanese overlay contains no kana", failures)
+                fail("Japanese settings resources contain no kana", failures)
             summary["ja_overlay_strings"] = string_count
         else:
-            fail(f"Japanese overlay missing: {JA_STRINGS_ENTRY}", failures)
+            fail(f"Japanese settings resources missing: {JA_STRINGS_ENTRY}", failures)
 
         manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8")
         # Unfold continuation lines of the JAR manifest format.
@@ -181,8 +245,6 @@ def main() -> int:
         else:
             fail("MANIFEST has no Patcher-Version", failures)
 
-    # Both feature patch sets must be present as code even though only
-    # the two umbrella patches are listed by name.
     for marker in DEX_CODE_MARKERS:
         if marker in dex:
             ok(f"dex code marker present: {marker.decode()}")
@@ -201,27 +263,29 @@ def main() -> int:
         else:
             fail(
                 f"patches list contains {len(listed)} patches, "
-                f"expected exactly {EXPECTED_LISTED_COUNT} (umbrella patches only)",
+                f"expected exactly {EXPECTED_LISTED_COUNT} "
+                f"(X {len(EXPECTED_PATCHES['com.twitter.android'])} + "
+                f"Twitch {len(EXPECTED_PATCHES['tv.twitch.android.app'])})",
                 failures,
             )
         seen: set[tuple[str, str]] = set()
         for patch in listed:
             for package in patch["packages"]:
                 seen.add((package, patch["name"]))
-                expected_names = UMBRELLA_PATCHES.get(package)
+                expected_names = EXPECTED_PATCHES.get(package)
                 if expected_names is None:
                     fail(f"listed patch targets unexpected app: {package}", failures)
                 elif patch["name"] not in expected_names:
                     fail(
                         f"listed patch for {package} is {patch['name']!r}, "
-                        f"expected one of {sorted(expected_names)}",
+                        f"expected one of the translated patch names",
                         failures,
                     )
             if patch["name"].encode("utf-8") not in dex:
                 fail(f"listed patch name missing from classes.dex: {patch['name']}", failures)
         expected_pairs = {
             (package, name)
-            for package, names in UMBRELLA_PATCHES.items()
+            for package, names in EXPECTED_PATCHES.items()
             for name in names
         }
         if seen != expected_pairs:
@@ -231,13 +295,14 @@ def main() -> int:
                 failures,
             )
     else:
-        for package, names in UMBRELLA_PATCHES.items():
+        for package, names in EXPECTED_PATCHES.items():
             for name in names:
                 if name.encode("utf-8") in dex:
-                    ok(f"umbrella patch for {package} found in dex: {name}")
                     listed.append({"name": name, "packages": [package]})
                 else:
-                    fail(f"umbrella patch name missing from dex: {name}", failures)
+                    fail(f"patch name missing from dex: {name}", failures)
+        if listed:
+            ok(f"all {len(listed)} patch names found in dex (no list given)")
 
     summary["listed_patches"] = listed
     summary["listed_patch_count"] = len(listed)

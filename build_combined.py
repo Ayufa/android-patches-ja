@@ -1,29 +1,36 @@
 #!/usr/bin/env python3
 """Build the combined Android Patches JA bundle (one .mpp).
 
-The bundle is built inside a fresh, read-only clone of upstream
-crimera/piko (branch ``x-lite``), exactly like the piko-newx-ja builder:
+Both patch sets are kept in this repository as translated source
+copies (the "clone upstream + translate only" model, v1.2.0+):
 
-1. Clone crimera/piko@x-lite (depth 1) into a temporary directory.
-2. Strip the clone down to the NewX patch set (pre_build_cleanup).
-3. Apply the Japanese resource overlay for the Piko settings UI
-   (localization/values-ja-rJP -> addresources/values-ja-rJP).
-4. Inject the Twitch patch set from sources/twitch (a translated source
-   copy kept in this repository): patch sources, patch resources
-   (reactnative/, hermes/), the extensions/twitch module and the
-   shared/ivs-api compile-only sources it needs.
-5. Restructure to one listed patch per app: strip the name/description
-   arguments from every feature patch declaration (making them
-   dependency-only) and inject the two umbrella patches from umbrella/,
-   whose dependsOn(...) pulls in each app's whole feature set.
-6. Rewrite the bundle metadata (name/description/source/author) in the
-   temporary tree and set the bundle version.
-7. Run ``./gradlew clean buildAndroid`` and copy out
+- sources/piko: a copy of upstream crimera/piko (branch ``x-lite``,
+  stripped to the NewX patch set) with the Japanese strings applied
+  in-tree: the Piko settings UI resources under
+  addresources/values-ja-rJP/ and the NewX patch names/descriptions
+  translated in the patch declarations. The upstream base commit is
+  recorded in sources/piko/UPSTREAM_BASE.md.
+- sources/twitch: a translated source copy of ryykitty/twitch-patched.
+
+The build itself adds no patch machinery of its own:
+
+1. Copy sources/piko into a temporary directory (it is the build
+   host: a full Piko tree with the Morphe Gradle plugin).
+2. Report the Japanese translation coverage of the Piko settings UI
+   (untranslated keys fall back to English at runtime).
+3. Inject the Twitch patch set from sources/twitch: patch sources,
+   patch resources (reactnative/, hermes/), the extensions/twitch
+   module and the shared/ivs-api compile-only sources it needs.
+4. Rewrite the bundle metadata (name/description/source/author) in
+   the temporary tree and set the bundle version.
+5. Run ``./gradlew clean buildAndroid`` and copy out
    patches-<version>.mpp. A patches list is generated afterwards on a
-   best-effort basis for verification/release metadata.
+   best-effort basis for verification/release metadata; the release
+   workflow fails if the list is missing (v1.1.0 shipped without one).
 
-Upstream repositories are only ever read (cloned / fetched), never
-written. All adaptations happen inside the throwaway build tree.
+Upstream repositories are only ever read (fetched / merged into the
+source copies by the daily sync), never written. All build-time
+adaptations happen inside the throwaway build tree.
 """
 
 import argparse
@@ -39,58 +46,20 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
 
-PIKO_REPO = "crimera/piko"
-PIKO_REPOSITORY = f"https://github.com/{PIKO_REPO}.git"
-PIKO_BRANCH = "x-lite"
+# X side: translated source copy of crimera/piko@x-lite kept in this
+# repository (see docs/UPSTREAM.md). Its patches/src tree doubles as
+# the build host for the combined bundle.
+PIKO_SOURCES = REPO_ROOT / "sources" / "piko"
+PIKO_BASE_FILE = PIKO_SOURCES / "UPSTREAM_BASE.md"
 XLITE_CONSTANTS = (
     "patches/src/main/kotlin/app/crimera/patches/newx/utils/Constants.kt"
 )
-
-# Japanese localization overlay: translated Android resources shipped in
-# this repository under localization/values-ja-rJP/. They are copied into
-# the freshly cloned upstream Piko tree at build time, so the X side of
-# the bundle always builds from the latest upstream x-lite sources with
-# the Japanese strings applied on top.
-LOCALIZATION_DIR = REPO_ROOT / "localization" / "values-ja-rJP"
 ADDRESOURCES_DIR = "patches/src/main/resources/addresources"
 
-# Twitch side: translated source copy of ryykitty/twitch-patched kept in
-# this repository (see docs/UPSTREAM.md). Injected into the build tree.
+# Twitch side: translated source copy of ryykitty/twitch-patched kept
+# in this repository (see docs/UPSTREAM.md). Injected into the build
+# tree hosted by the Piko copy.
 TWITCH_SOURCES = REPO_ROOT / "sources" / "twitch"
-
-# One patch per app (v1.1.0+): the umbrella patch sources kept in this
-# repository. build_combined.py strips every feature patch's name at
-# build time (see apply_one_patch_per_app) and copies these into the
-# build tree, so Morphe's patch list shows exactly one patch per app.
-UMBRELLA_DIR = REPO_ROOT / "umbrella"
-
-# Feature patches deliberately NOT pulled in by the umbrellas. Each was
-# opt-in upstream (default = false) and cannot be disabled at runtime,
-# so applying it unconditionally would change the app for every user:
-#
-# - clonePatch (NewX: Clone): renames the app package name / app name
-#   from its patch options; unconditional application would turn every
-#   install into the clone, and an unlisted patch's options cannot be
-#   presented or changed in Morphe Manager.
-# - bringBackTwitterPatch (NewX: Restore Twitter branding): replaces
-#   the app label, icons and splash resources at patch time; resources
-#   cannot be toggled at runtime.
-# - newXAudioRenditionDiagnosticsPatch (NewX: Log HLS audio renditions):
-#   diagnostic logging hooks with no runtime off switch.
-# - inspectPlaybackPatch (Twitch: 再生の診断): wraps the playback HTTP
-#   client and installs tracing hooks; no runtime off switch.
-#
-# The patches' code still ships inside the bundle; it simply never
-# executes. Every other opt-in patch IS included, because its behaviour
-# is gated by an in-app settings toggle (NewX: Browse tweet object,
-# Hide post dividers, Server error logging) or performs no modification
-# at all (Twitch: Twitch APKを検査 only validates/logs at patch time).
-COMBINED_EXCLUDED_PATCHES = {
-    "clonePatch": "renames the app package/name; options not settable when unlisted",
-    "bringBackTwitterPatch": "replaces app branding at patch time; not runtime-toggleable",
-    "newXAudioRenditionDiagnosticsPatch": "always-on diagnostic logging; no runtime off switch",
-    "inspectPlaybackPatch": "always-on playback tracing hooks; no runtime off switch",
-}
 
 # Combined bundle metadata written into the temporary tree's
 # patches/build.gradle.kts about block (ends up in the .mpp MANIFEST).
@@ -105,48 +74,53 @@ BUNDLE_WEBSITE = "https://github.com/Ayufa/android-patches-ja"
 BUNDLE_LICENSE = "GNU General Public License v3.0"
 
 
+def piko_base_commit() -> str:
+    """Upstream piko commit the sources/piko copy is based on."""
+    match = re.search(
+        r"^- commit:\s*([0-9a-f]{40})\s*$",
+        PIKO_BASE_FILE.read_text(encoding="utf-8"),
+        re.M,
+    )
+    if not match:
+        raise ValueError(f"No base commit recorded in {PIKO_BASE_FILE}")
+    return match.group(1)
+
+
 def _string_keys(xml_text: str) -> set[str]:
     return set(re.findall(r'<string\s+name="([^"]+)"', xml_text))
 
 
-def apply_japanese_localization(piko_directory: Path) -> None:
-    """Copy the Japanese resources into the cloned Piko tree.
+def report_translation_coverage(piko_directory: Path) -> None:
+    """Report untranslated Piko settings strings in the source copy.
 
     Missing keys are not an error: Android falls back to the default
-    (English) resources, so new upstream strings stay visible in English
-    until they are translated. They are reported here so a release log
-    shows the translation coverage.
+    (English) resources, so new upstream strings stay visible in
+    English until they are translated. They are reported here so a
+    release log shows the translation coverage.
     """
-    if not LOCALIZATION_DIR.is_dir():
-        print("No localization directory found; building without Japanese overlay")
+    english_file = (
+        piko_directory / ADDRESOURCES_DIR / "values" / "newx" / "strings.xml"
+    )
+    japanese_file = (
+        piko_directory / ADDRESOURCES_DIR / "values-ja-rJP" / "newx" / "strings.xml"
+    )
+    if not japanese_file.is_file():
+        print("No Japanese settings resources in sources/piko; building untranslated")
         return
-
-    target_root = piko_directory / ADDRESOURCES_DIR / "values-ja-rJP"
-    for source_file in sorted(LOCALIZATION_DIR.rglob("*.xml")):
-        relative = source_file.relative_to(LOCALIZATION_DIR)
-        destination = target_root / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source_file, destination)
-        print(f"Applied Japanese localization: values-ja-rJP/{relative.as_posix()}")
-
-        english_file = (
-            piko_directory / ADDRESOURCES_DIR / "values" / relative
+    english_keys = _string_keys(english_file.read_text(encoding="utf-8"))
+    japanese_keys = _string_keys(japanese_file.read_text(encoding="utf-8"))
+    missing = sorted(english_keys - japanese_keys)
+    if missing:
+        print(
+            f"  {len(missing)} untranslated string(s) fall back to English: "
+            + ", ".join(missing)
         )
-        if english_file.is_file():
-            english_keys = _string_keys(english_file.read_text(encoding="utf-8"))
-            japanese_keys = _string_keys(source_file.read_text(encoding="utf-8"))
-            missing = sorted(english_keys - japanese_keys)
-            if missing:
-                print(
-                    f"  {len(missing)} untranslated string(s) fall back to English: "
-                    + ", ".join(missing)
-                )
-            else:
-                print(f"  translation coverage: {len(japanese_keys)}/{len(english_keys)}")
+    else:
+        print(f"  translation coverage: {len(japanese_keys)}/{len(english_keys)}")
 
 
 def get_supported_versions(constants: str) -> frozenset[str]:
-    """Return the X-Lite app versions supported by the checked-out Piko source."""
+    """Return the X-Lite app versions supported by the Piko source copy."""
     versions = frozenset(
         re.findall(r'AppTarget\(version\s*=\s*"([^"]+)"\)', constants)
     )
@@ -155,48 +129,11 @@ def get_supported_versions(constants: str) -> frozenset[str]:
     return versions
 
 
-def pre_build_cleanup(piko_directory: Path) -> None:
-    """Remove Instagram, Twitter, and legacy patches/extensions before building."""
-    # Remove non-NewX patch source packages
-    for path in [
-        piko_directory / "patches/src/main/kotlin/app/crimera/patches/instagram",
-        piko_directory / "patches/src/main/kotlin/app/crimera/patches/twitter",
-        piko_directory / "patches/src/main/kotlin/app/revanced",
-    ]:
-        if path.exists():
-            shutil.rmtree(path)
-
-    # Remove non-NewX extension modules
-    for path in [
-        piko_directory / "extensions/instagram",
-        piko_directory / "extensions/twitter",
-    ]:
-        if path.exists():
-            shutil.rmtree(path)
-
-    # Keep twitter/bringbacktwitter assets for Bring back twitter patch
-    twitter_res = piko_directory / "patches/src/main/resources/twitter"
-    if twitter_res.exists():
-        for item in twitter_res.iterdir():
-            if item.name != "bringbacktwitter":
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink()
-
-    addresources_dir = piko_directory / "patches/src/main/resources/addresources"
-    if addresources_dir.exists():
-        for res_name in ("instagram", "twitter"):
-            for matched in addresources_dir.glob(f"*/{res_name}"):
-                if matched.is_dir():
-                    shutil.rmtree(matched)
-
-
 def _copy_tree(source: Path, destination: Path) -> None:
     if not source.is_dir():
-        raise FileNotFoundError(f"Twitch source tree is missing: {source}")
+        raise FileNotFoundError(f"Source tree is missing: {source}")
     shutil.copytree(source, destination, dirs_exist_ok=True)
-    print(f"Injected Twitch sources: {destination}")
+    print(f"Copied tree: {source} -> {destination}")
 
 
 def _strip_extension_dsl(build_file: Path) -> None:
@@ -305,6 +242,17 @@ def _rewrite_about_block(piko_directory: Path) -> None:
     print("Rewrote bundle about metadata for Android Patches JA")
 
 
+def prepare_build_tree(piko_directory: Path) -> None:
+    """Copy the sources/piko tree into the throwaway build directory."""
+    _copy_tree(PIKO_SOURCES, piko_directory)
+    # The copy carries upstream's own stale patches-list.json; remove
+    # it so only a list generated by this build can be picked up.
+    stale_list = piko_directory / "patches-list.json"
+    if stale_list.exists():
+        stale_list.unlink()
+        print("Removed stale patches-list.json from the build tree")
+
+
 def inject_twitch_sources(piko_directory: Path) -> None:
     """Copy the Twitch patch set from sources/twitch into the build tree."""
     patches_main = TWITCH_SOURCES / "patches" / "src" / "main"
@@ -329,462 +277,8 @@ def inject_twitch_sources(piko_directory: Path) -> None:
     _rewrite_about_block(piko_directory)
 
 
-# ---------------------------------------------------------------------------
-# One patch per app
-#
-# Morphe's PatchLoader only lists patches whose name is non-null (the
-# Patch KDoc in morphe-patcher states an unnamed patch "will not be
-# loaded by PatchLoader"), while unnamed patches still execute when a
-# listed patch depends on them. So the bundle ships one named umbrella
-# patch per app (umbrella/*.kt, kept in this repository) whose
-# dependsOn(...) lists the app's feature patches, and every feature
-# patch declaration has its `name`/`description` arguments stripped
-# here, in the throwaway build tree only. Kept sources stay pristine.
-#
-# The umbrella dependsOn lists double as the manifest of included
-# patches: the build fails if the set of named patches found upstream
-# differs from manifest + COMBINED_EXCLUDED_PATCHES, so a patch added,
-# removed or renamed upstream can never silently vanish from (or sneak
-# into) the combined bundle -- the daily sync must consciously add it to
-# an umbrella or to the exclusion list. See docs/UPSTREAM.md.
-
-_PATCH_BUILDER_CALL = re.compile(
-    r"\b(?:bytecodePatch|resourcePatch|rawResourcePatch)\s*\("
-)
-_PATCH_VAL_PREFIX = re.compile(
-    r"(?:(private|internal)\s+)?val\s+([A-Za-z_]\w*)\s*=\s*$"
-)
-_TOP_LEVEL_ARG_NAME = re.compile(r"\s*([A-Za-z_]\w*)\s*=")
-
-
-def _scan_parens(text: str, open_index: int) -> tuple[int, list[int]]:
-    """Scan the argument list whose '(' is at open_index.
-
-    Returns (close_index, top_level_comma_indexes). String literals
-    (plain, triple-quoted, with ${ } templates), char literals and
-    comments are honoured so brackets inside them do not count.
-    """
-    stack: list = ["code"]
-    template_brace_marks: list[int] = []
-    depth = 1
-    brace = 0
-    bracket = 0
-    commas: list[int] = []
-    i = open_index + 1
-    n = len(text)
-    while i < n:
-        mode = stack[-1]
-        char = text[i]
-        if mode == "code":
-            if text.startswith("//", i):
-                stack.append("line")
-                i += 2
-                continue
-            if text.startswith("/*", i):
-                stack.append("block")
-                i += 2
-                continue
-            if text.startswith('"""', i):
-                stack.append(("str", True))
-                i += 3
-                continue
-            if char == '"':
-                stack.append(("str", False))
-                i += 1
-                continue
-            if char == "'":
-                stack.append("char")
-                i += 1
-                continue
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-                if depth == 0:
-                    return i, commas
-            elif char == "{":
-                brace += 1
-            elif char == "}":
-                if (
-                    len(stack) > 1
-                    and template_brace_marks
-                    and brace == template_brace_marks[-1]
-                ):
-                    stack.pop()
-                    template_brace_marks.pop()
-                    i += 1
-                    continue
-                brace -= 1
-            elif char == "[":
-                bracket += 1
-            elif char == "]":
-                bracket -= 1
-            elif (
-                char == ","
-                and depth == 1
-                and brace == 0
-                and bracket == 0
-                and len(stack) == 1
-            ):
-                commas.append(i)
-            i += 1
-            continue
-        if mode == "line":
-            if char == "\n":
-                stack.pop()
-            i += 1
-            continue
-        if mode == "block":
-            if text.startswith("*/", i):
-                stack.pop()
-                i += 2
-                continue
-            i += 1
-            continue
-        if mode == "char":
-            if char == "\\":
-                i += 2
-                continue
-            if char == "'":
-                stack.pop()
-            i += 1
-            continue
-        # String literal modes: mode == ("str", triple)
-        triple = mode[1]
-        if triple and text.startswith('"""', i):
-            stack.pop()
-            i += 3
-            continue
-        if not triple and char == "\\":
-            i += 2
-            continue
-        if not triple and char == '"':
-            stack.pop()
-            i += 1
-            continue
-        if text.startswith("${", i):
-            stack.append("code")
-            template_brace_marks.append(brace)
-            i += 2
-            continue
-        i += 1
-    raise ValueError("Unbalanced parentheses while scanning patch declaration")
-
-
-@dataclass
-class _PatchDeclaration:
-    val: str | None
-    private: bool
-    has_name: bool
-    removable_args: list[tuple[int, int]]  # (start, end) of name/description args
-
-
-def _find_patch_declarations(text: str) -> list[_PatchDeclaration]:
-    """Find every patch builder call and classify its declaration."""
-    declarations: list[_PatchDeclaration] = []
-    for match in _PATCH_BUILDER_CALL.finditer(text):
-        open_index = match.end() - 1
-        close_index, commas = _scan_parens(text, open_index)
-        bounds = [open_index, *commas, close_index]
-        has_name = False
-        removable: list[tuple[int, int]] = []
-        for seg_start, seg_end in zip(bounds, bounds[1:]):
-            segment = text[seg_start + 1 : seg_end]
-            name_match = _TOP_LEVEL_ARG_NAME.match(segment)
-            if not name_match:
-                continue
-            arg_name = name_match.group(1)
-            if arg_name not in ("name", "description"):
-                continue
-            core_start = seg_start + 1 + (
-                len(segment) - len(segment.lstrip())
-            )
-            core_end = seg_start + 1 + len(segment.rstrip())
-            if arg_name == "name":
-                has_name = True
-            removable.append((core_start, core_end))
-        prefix = text[max(0, match.start() - 300) : match.start()]
-        val_match = _PATCH_VAL_PREFIX.search(prefix)
-        val = val_match.group(2) if val_match else None
-        private = bool(val_match and val_match.group(1) == "private")
-        if has_name and val is None:
-            raise ValueError(
-                "Named patch declaration without a val prefix near: "
-                + text[max(0, match.start() - 80) : match.start() + 40]
-            )
-        declarations.append(
-            _PatchDeclaration(
-                val=val, private=private, has_name=has_name,
-                removable_args=removable,
-            )
-        )
-    return declarations
-
-
-def _excision_interval(text: str, start: int, end: int) -> tuple[int, int]:
-    """Widen an argument span to include its comma and line layout."""
-    ahead = end
-    while ahead < len(text) and text[ahead] in " \t":
-        ahead += 1
-    if ahead < len(text) and text[ahead] == ",":
-        stop = ahead + 1
-        probe = stop
-        while probe < len(text) and text[probe] in " \t":
-            probe += 1
-        if probe < len(text) and text[probe] == "\n":
-            stop = probe + 1
-            while stop < len(text) and text[stop] in " \t":
-                stop += 1
-        return (start, stop)
-    behind = start
-    while behind > 0 and text[behind - 1] in " \t":
-        behind -= 1
-    if behind > 0 and text[behind - 1] == ",":
-        return (behind - 1, end)
-    return (start, end)
-
-
-def _strip_names_in_file(path: Path) -> list[str]:
-    """Remove name/description from public patch declarations in a file.
-
-    Returns the vals whose names were stripped. Private declarations
-    (already dependency-only upstream) are left untouched.
-    """
-    text = path.read_text(encoding="utf-8")
-    declarations = _find_patch_declarations(text)
-    intervals: list[tuple[int, int]] = []
-    stripped: list[str] = []
-    for declaration in declarations:
-        if not declaration.has_name or declaration.private:
-            continue
-        assert declaration.val is not None
-        stripped.append(declaration.val)
-        for arg_start, arg_end in declaration.removable_args:
-            intervals.append(_excision_interval(text, arg_start, arg_end))
-    if not intervals:
-        return stripped
-    new_text = text
-    for start, end in sorted(intervals, reverse=True):
-        new_text = new_text[:start] + new_text[end:]
-    remaining = _find_patch_declarations(new_text)
-    if len(remaining) != len(declarations):
-        raise ValueError(f"Patch declaration count changed in {path}")
-    for declaration in remaining:
-        if declaration.has_name and not declaration.private:
-            raise ValueError(
-                f"Public named patch {declaration.val} survived stripping in {path}"
-            )
-    path.write_text(new_text, encoding="utf-8")
-    return stripped
-
-
-def _strip_names_under(roots: list[Path]) -> set[str]:
-    stripped: set[str] = set()
-    for root in roots:
-        if not root.is_dir():
-            raise FileNotFoundError(f"Patch source root missing: {root}")
-        for kotlin_file in sorted(root.rglob("*.kt")):
-            stripped.update(_strip_names_in_file(kotlin_file))
-    return stripped
-
-
-def _umbrella_dependencies(umbrella_file: Path) -> list[str]:
-    text = umbrella_file.read_text(encoding="utf-8")
-    match = re.search(r"dependsOn\((.*?)\)", text, re.S)
-    if not match:
-        raise ValueError(f"No dependsOn block in umbrella patch {umbrella_file}")
-    return re.findall(r"[A-Za-z_]\w*", match.group(1))
-
-
-# Patches that require a standard (non-mount) install when reached
-# through a dependency closure -- mirrors upstream piko's
-# SettingsAggregateValidationTest standardOnly set.
-_STANDARD_ONLY_PATCHES = {
-    "newXSettingsPatch",
-    "newXSettingsResourcePatch",
-    "downloaderManifestPatch",
-    "clonePatch",
-    "bringBackTwitterPatch",
-}
-
-# Tokens marking a patch builder as tied to the settings aggregate
-# (and therefore to a standard install): the settings contribution DSL
-# adds a dependency on the settings base patch at build time.
-_SETTINGS_DSL_TOKENS = (
-    "newXSettings(",
-    "newXToggle(",
-    "newXSingleChoice(",
-    "newXMultiChoice(",
-    "newXTextInput(",
-    "contributeSettings(",
-    "settingsToggle(",
-    "newXPostOption(",
-)
-
-_TOP_LEVEL_DECL = re.compile(
-    r"(?m)^(?:private\s+|internal\s+|public\s+)?(?:val|fun|object|class)\s+(\w+)"
-)
-
-
-def _val_regions(roots: list[Path]) -> dict[str, str]:
-    """Map every top-level val name under roots to its source region.
-
-    A region runs from the val's declaration to the next top-level
-    declaration in the same file. Approximate, but sufficient for the
-    mount-compatibility guard below (upstream's own JVM test in CI is
-    the ground truth and runs before the patches list is generated).
-    """
-    regions: dict[str, str] = {}
-    for root in roots:
-        for kotlin_file in sorted(root.rglob("*.kt")):
-            text = kotlin_file.read_text(encoding="utf-8")
-            starts = list(_TOP_LEVEL_DECL.finditer(text))
-            for index, match in enumerate(starts):
-                end = (
-                    starts[index + 1].start()
-                    if index + 1 < len(starts)
-                    else len(text)
-                )
-                regions.setdefault(match.group(1), text[match.start() : end])
-    return regions
-
-
-def _mount_compatible_subset(roots: list[Path], included: set[str]) -> set[str]:
-    """Compute which included NewX patches are mount-compatible.
-
-    Mirrors upstream's own classification: a patch is mount-compatible
-    when it does not declare itself unavailable on mount, does not use
-    the settings contribution DSL (which depends on the settings base
-    patch), and its dependsOn closure reaches neither a
-    standard-install-only patch nor a patch failing these checks.
-    """
-    regions = _val_regions(roots)
-    graph: dict[str, list[str]] = {}
-    region_dirty: dict[str, bool] = {}
-    for val, region in regions.items():
-        deps: list[str] = []
-        for dep_match in re.finditer(r"dependsOn\s*\(", region):
-            close_index, _ = _scan_parens(region, dep_match.end() - 1)
-            deps += re.findall(r"[A-Za-z_]\w*", region[dep_match.end() : close_index])
-        graph[val] = deps
-        region_dirty[val] = (
-            "unsupportedOnMount(" in region
-            or any(token in region for token in _SETTINGS_DSL_TOKENS)
-        )
-
-    def closure_dirty(val: str, visited: set[str]) -> bool:
-        if val in visited:
-            return False
-        visited.add(val)
-        if val in _STANDARD_ONLY_PATCHES or region_dirty.get(val, False):
-            return True
-        return any(closure_dirty(dep, visited) for dep in graph.get(val, []))
-
-    return {val for val in included if not closure_dirty(val, set())}
-
-
-def apply_one_patch_per_app(piko_directory: Path) -> dict:
-    """Strip feature patch names and inject the umbrella patches."""
-    kotlin_root = piko_directory / "patches" / "src" / "main" / "kotlin"
-    newx_root = kotlin_root / "app" / "crimera" / "patches" / "newx"
-    plans = [
-        (
-            "x",
-            [
-                (
-                    UMBRELLA_DIR / "NewXCombinedPatch.kt",
-                    newx_root / "NewXCombinedPatch.kt",
-                ),
-                (
-                    UMBRELLA_DIR / "NewXMountCombinedPatch.kt",
-                    newx_root / "NewXMountCombinedPatch.kt",
-                ),
-            ],
-            [kotlin_root / "app" / "crimera" / "patches"],
-            {
-                "clonePatch",
-                "bringBackTwitterPatch",
-                "newXAudioRenditionDiagnosticsPatch",
-            },
-        ),
-        (
-            "twitch",
-            [
-                (
-                    UMBRELLA_DIR / "TwitchCombinedPatch.kt",
-                    kotlin_root
-                    / "dev" / "twitchpatches" / "patches" / "twitch"
-                    / "TwitchCombinedPatch.kt",
-                ),
-            ],
-            [kotlin_root / "dev"],
-            {"inspectPlaybackPatch"},
-        ),
-    ]
-    summary: dict = {}
-    for side, umbrellas, roots, excluded in plans:
-        if not excluded <= set(COMBINED_EXCLUDED_PATCHES):
-            raise ValueError(
-                f"Exclusions for {side} lack a documented reason: "
-                f"{sorted(excluded - set(COMBINED_EXCLUDED_PATCHES))}"
-            )
-        manifests = {
-            umbrella_file.stem: set(_umbrella_dependencies(umbrella_file))
-            for umbrella_file, _ in umbrellas
-        }
-        manifest = set().union(*manifests.values())
-        stripped = _strip_names_under(roots)
-        expected = manifest | excluded
-        if stripped != expected:
-            missing = sorted(expected - stripped)
-            unexpected = sorted(stripped - expected)
-            raise ValueError(
-                f"One-patch restructure mismatch for {side}: "
-                f"declared upstream but not in umbrella/exclusions: {unexpected}; "
-                f"in umbrella/exclusions but not declared upstream: {missing}. "
-                "Update umbrella/*.kt or COMBINED_EXCLUDED_PATCHES consciously "
-                "(see docs/UPSTREAM.md)."
-            )
-        entry: dict = {"stripped": len(stripped)}
-        if side == "x":
-            standard = manifests["NewXCombinedPatch"]
-            mount = manifests["NewXMountCombinedPatch"]
-            if not mount <= standard:
-                raise ValueError(
-                    "Mount umbrella must be a subset of the standard umbrella: "
-                    f"{sorted(mount - standard)}"
-                )
-            computed_mount = _mount_compatible_subset(roots, standard)
-            if computed_mount != mount:
-                raise ValueError(
-                    "Mount umbrella membership diverges from the computed "
-                    f"mount-compatible subset: umbrella has {sorted(mount)}, "
-                    f"computed {sorted(computed_mount)}. Review the new "
-                    "patches and update umbrella/NewXMountCombinedPatch.kt "
-                    "consciously (see docs/UPSTREAM.md)."
-                )
-            entry["umbrella"] = "NewXCombinedPatch"
-            entry["included"] = len(standard)
-            entry["mount_umbrella"] = "NewXMountCombinedPatch"
-            entry["mount_included"] = len(mount)
-        else:
-            entry["umbrella"] = umbrellas[0][0].stem
-            entry["included"] = len(manifest)
-        for umbrella_file, destination in umbrellas:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(umbrella_file, destination)
-        summary[side] = entry
-        print(
-            f"One patch per app ({side}): stripped names from "
-            f"{len(stripped)} feature patches, umbrellas depend on "
-            f"{len(manifest)} of them"
-        )
-    summary["excluded"] = sorted(COMBINED_EXCLUDED_PATCHES)
-    return summary
-
-
 def set_project_version(piko_directory: Path, version: str) -> None:
-    """Set the version only in the temporary Piko checkout used for a build."""
+    """Set the version only in the temporary Piko tree used for a build."""
     properties_path = piko_directory / "gradle.properties"
     lines = properties_path.read_text(encoding="utf-8").splitlines(keepends=True)
     version_indexes = [
@@ -817,7 +311,6 @@ class CombinedBuild:
     supported_versions: frozenset[str]
     twitch_base: str
     patches_list: Path | None = field(default=None)
-    one_patch_per_app: dict = field(default_factory=dict)
 
 
 def build_combined(
@@ -830,31 +323,17 @@ def build_combined(
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    base_commit = piko_base_commit()
+    supported_versions = get_supported_versions(
+        (PIKO_SOURCES / XLITE_CONSTANTS).read_text(encoding="utf-8")
+    )
+
     with tempfile.TemporaryDirectory(prefix="android-patches-ja-") as temporary_directory:
         piko_directory = Path(temporary_directory) / "piko"
 
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "--depth",
-                "1",
-                "--branch",
-                PIKO_BRANCH,
-                PIKO_REPOSITORY,
-                str(piko_directory),
-            ],
-            check=True,
-        )
-
-        supported_versions = get_supported_versions(
-            (piko_directory / XLITE_CONSTANTS).read_text()
-        )
-
-        pre_build_cleanup(piko_directory)
-        apply_japanese_localization(piko_directory)
+        prepare_build_tree(piko_directory)
+        report_translation_coverage(piko_directory)
         inject_twitch_sources(piko_directory)
-        one_patch_per_app = apply_one_patch_per_app(piko_directory)
         set_project_version(piko_directory, bundle_version)
 
         subprocess.run(
@@ -874,11 +353,10 @@ def build_combined(
         print(f"Built combined bundle: {output_path}")
 
         # Best effort: generate the patches list for verification and
-        # release metadata. Failure here must not fail the build itself.
+        # release metadata. The release workflow fails the release if
+        # the list is missing, so a failure here cannot ship silently.
         patches_list: Path | None = None
         try:
-            # The clone ships an upstream patches-list.json; only a file
-            # written after this point counts as generated by this build.
             list_search_after = time.time()
             subprocess.run(
                 ["./gradlew", ":patches:generatePatchesList"],
@@ -902,20 +380,11 @@ def build_combined(
         except subprocess.CalledProcessError as error:
             print(f"WARNING: generatePatchesList failed ({error}); continuing")
 
-        commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=piko_directory,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-
     return CombinedBuild(
-        piko_commit=commit.stdout.strip(),
+        piko_commit=base_commit,
         supported_versions=supported_versions,
         twitch_base=twitch_base_version(),
         patches_list=patches_list,
-        one_patch_per_app=one_patch_per_app,
     )
 
 
@@ -949,11 +418,11 @@ def main() -> None:
     metadata = {
         "version": args.version,
         "piko_commit": result.piko_commit,
-        "piko_branch": PIKO_BRANCH,
+        "piko_branch": "x-lite",
+        "piko_source": "sources/piko (translated source copy)",
         "x_supported_versions": sorted(result.supported_versions),
         "twitch_base_version": result.twitch_base,
         "patches_list_generated": result.patches_list is not None,
-        "one_patch_per_app": result.one_patch_per_app,
     }
     metadata_path.write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n",
