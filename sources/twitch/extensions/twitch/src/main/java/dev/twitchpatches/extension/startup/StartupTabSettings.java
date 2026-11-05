@@ -11,9 +11,10 @@ import java.util.List;
 
 /**
  * Runtime policy for the Ayufa startup tab patch: remembers which home tab
- * Twitch opens on a cold start. The injected bridge reads {@link #selectedTab()}
- * only when Twitch itself would fall back to its default (Live) page, so
- * deep links and restored navigation keep their explicit page.
+ * Twitch opens on a cold start. The injected bridge wraps Twitch's default
+ * home page provider and reads {@link #selectedTab()}; deep links and push
+ * notifications carry their own page and never consult that provider, so
+ * they keep their explicit page.
  */
 public final class StartupTabSettings {
     private static volatile int selected = StartupTab.LIVE;
@@ -26,7 +27,14 @@ public final class StartupTabSettings {
         PatchSettings.register(new StartupTabGroup());
     }
 
-    public static int selectedTab() { return selected; }
+    /**
+     * The tab chosen in Patch settings, or -1 while the user has never
+     * chosen one, in which case the bridge keeps Twitch's own default.
+     */
+    public static int selectedTab() {
+        SharedPreferences prefs = preferences;
+        return prefs != null && prefs.contains("startup_tab") ? selected : -1;
+    }
 
     private static void select(int tab) {
         selected = tab;
