@@ -9,13 +9,14 @@ Checks that the single bundle really contains both patch sets:
 - MANIFEST metadata points at this project and carries a
   Patcher-Version.
 - the Japanese overlay holds the full Piko settings translation.
-- patch inventory: the bundle lists exactly ONE patch per app
-  (v1.1.0+ umbrella structure). When a patches-list.json from the
-  build is given, it must contain exactly 2 patches -- one targeting
-  com.twitter.android, one targeting tv.twitch.android.app -- and
-  both names must be present in classes.dex. The feature patch code
-  of both sets (which is no longer listed individually) is checked
-  via code markers in classes.dex and the extension payloads.
+- patch inventory: the bundle lists only umbrella patches (v1.1.0+
+  structure): two for X (standard-install and mount-install) and one
+  for Twitch. When a patches-list.json from the build is given, it
+  must contain exactly those patches for com.twitter.android /
+  tv.twitch.android.app, and the names must be present in
+  classes.dex. The feature patch code of both sets (which is no
+  longer listed individually) is checked via code markers in
+  classes.dex and the extension payloads.
 
 Writes a bundle-summary.json next to the bundle and exits non-zero
 when any check fails.
@@ -34,11 +35,18 @@ EXPECTED_EXTENSIONS = {
     "extensions/twitch.mpe",
 }
 JA_STRINGS_ENTRY = "addresources/values-ja-rJP/newx/strings.xml"
-# The two umbrella patches are the only listed patches since v1.1.0.
+# The umbrella patches are the only listed patches since v1.1.0.
+# X has two: the standard-install umbrella (full feature set) and the
+# mount-install umbrella (the mount-compatible subset upstream keeps
+# available on mount installs). Twitch has one.
 UMBRELLA_PATCHES = {
-    "com.twitter.android": "X（NewX）日本語化パッチ",
-    "tv.twitch.android.app": "Twitch 日本語化パッチ",
+    "com.twitter.android": {
+        "X（NewX）日本語化パッチ",
+        "X（NewX）日本語化パッチ（マウント用）",
+    },
+    "tv.twitch.android.app": {"Twitch 日本語化パッチ"},
 }
+EXPECTED_LISTED_COUNT = sum(len(names) for names in UMBRELLA_PATCHES.values())
 # Code markers proving both feature patch sets survived in classes.dex
 # even though the feature patches are no longer listed by name: class
 # descriptor prefixes of both sets, plus the settings key of a
@@ -188,39 +196,48 @@ def main() -> int:
     listed: list[dict] = []
     if args.patches_list:
         listed = load_patches(Path(args.patches_list))
-        if len(listed) == len(UMBRELLA_PATCHES):
+        if len(listed) == EXPECTED_LISTED_COUNT:
             ok(f"patches list contains exactly {len(listed)} patches")
         else:
             fail(
                 f"patches list contains {len(listed)} patches, "
-                f"expected exactly {len(UMBRELLA_PATCHES)} (one per app)",
+                f"expected exactly {EXPECTED_LISTED_COUNT} (umbrella patches only)",
                 failures,
             )
-        seen_packages: set[str] = set()
+        seen: set[tuple[str, str]] = set()
         for patch in listed:
             for package in patch["packages"]:
-                seen_packages.add(package)
-                expected_name = UMBRELLA_PATCHES.get(package)
-                if expected_name is None:
+                seen.add((package, patch["name"]))
+                expected_names = UMBRELLA_PATCHES.get(package)
+                if expected_names is None:
                     fail(f"listed patch targets unexpected app: {package}", failures)
-                elif patch["name"] != expected_name:
+                elif patch["name"] not in expected_names:
                     fail(
                         f"listed patch for {package} is {patch['name']!r}, "
-                        f"expected {expected_name!r}",
+                        f"expected one of {sorted(expected_names)}",
                         failures,
                     )
             if patch["name"].encode("utf-8") not in dex:
                 fail(f"listed patch name missing from classes.dex: {patch['name']}", failures)
-        missing_apps = set(UMBRELLA_PATCHES) - seen_packages
-        if missing_apps:
-            fail(f"no listed patch for app(s): {sorted(missing_apps)}", failures)
+        expected_pairs = {
+            (package, name)
+            for package, names in UMBRELLA_PATCHES.items()
+            for name in names
+        }
+        if seen != expected_pairs:
+            fail(
+                f"listed (app, patch) pairs differ: missing "
+                f"{sorted(expected_pairs - seen)}, unexpected {sorted(seen - expected_pairs)}",
+                failures,
+            )
     else:
-        for package, name in UMBRELLA_PATCHES.items():
-            if name.encode("utf-8") in dex:
-                ok(f"umbrella patch for {package} found in dex: {name}")
-                listed.append({"name": name, "packages": [package]})
-            else:
-                fail(f"umbrella patch name missing from dex: {name}", failures)
+        for package, names in UMBRELLA_PATCHES.items():
+            for name in names:
+                if name.encode("utf-8") in dex:
+                    ok(f"umbrella patch for {package} found in dex: {name}")
+                    listed.append({"name": name, "packages": [package]})
+                else:
+                    fail(f"umbrella patch name missing from dex: {name}", failures)
 
     summary["listed_patches"] = listed
     summary["listed_patch_count"] = len(listed)

@@ -1,6 +1,7 @@
 package app.crimera.patches.newx
 
 import app.crimera.patches.newx.utils.Constants.COMPATIBILITY_NEW_X
+import app.crimera.patches.newx.utils.unsupportedOnMount
 import app.morphe.patcher.patch.bytecodePatch
 import app.crimera.patches.newx.ads.newXHideAdsPatch
 import app.crimera.patches.newx.misc.blur.newXDisableBlurPatch
@@ -66,6 +67,11 @@ import app.crimera.patches.newx.translation.newXTranslatorPatch
  * build_combined.py fails the build if the set of named upstream patches
  * differs from this list plus the documented exclusions, so a new upstream
  * patch can never be silently dropped. See docs/UPSTREAM.md.
+ *
+ * X ships a second umbrella, NewXMountCombinedPatch, with the small
+ * mount-compatible subset: upstream's validation requires the selectable
+ * set to keep a mount-compatible patch, and this umbrella's feature set
+ * (settings screen included) requires a standard install.
  */
 @Suppress("unused")
 val newXCombinedPatch =
@@ -74,6 +80,11 @@ val newXCombinedPatch =
         description = "NewX の全機能パッチをまとめて適用します。個別機能のオン・オフは、適用後の X アプリ内「NewX 設定」画面で行えます。",
         default = true,
     ) {
+        // The feature set needs the settings screen and other
+        // standard-install-only pieces, so -- exactly like the upstream
+        // feature patches themselves -- this umbrella is unavailable
+        // on mount installs. Mount installs use newXMountCombinedPatch.
+        unsupportedOnMount(default = true)
         compatibleWith(COMPATIBILITY_NEW_X)
 
         dependsOn(

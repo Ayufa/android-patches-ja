@@ -596,19 +596,111 @@ def _umbrella_dependencies(umbrella_file: Path) -> list[str]:
     return re.findall(r"[A-Za-z_]\w*", match.group(1))
 
 
+# Patches that require a standard (non-mount) install when reached
+# through a dependency closure -- mirrors upstream piko's
+# SettingsAggregateValidationTest standardOnly set.
+_STANDARD_ONLY_PATCHES = {
+    "newXSettingsPatch",
+    "newXSettingsResourcePatch",
+    "downloaderManifestPatch",
+    "clonePatch",
+    "bringBackTwitterPatch",
+}
+
+# Tokens marking a patch builder as tied to the settings aggregate
+# (and therefore to a standard install): the settings contribution DSL
+# adds a dependency on the settings base patch at build time.
+_SETTINGS_DSL_TOKENS = (
+    "newXSettings(",
+    "newXToggle(",
+    "newXSingleChoice(",
+    "newXMultiChoice(",
+    "newXTextInput(",
+    "contributeSettings(",
+    "settingsToggle(",
+    "newXPostOption(",
+)
+
+_TOP_LEVEL_DECL = re.compile(
+    r"(?m)^(?:private\s+|internal\s+|public\s+)?(?:val|fun|object|class)\s+(\w+)"
+)
+
+
+def _val_regions(roots: list[Path]) -> dict[str, str]:
+    """Map every top-level val name under roots to its source region.
+
+    A region runs from the val's declaration to the next top-level
+    declaration in the same file. Approximate, but sufficient for the
+    mount-compatibility guard below (upstream's own JVM test in CI is
+    the ground truth and runs before the patches list is generated).
+    """
+    regions: dict[str, str] = {}
+    for root in roots:
+        for kotlin_file in sorted(root.rglob("*.kt")):
+            text = kotlin_file.read_text(encoding="utf-8")
+            starts = list(_TOP_LEVEL_DECL.finditer(text))
+            for index, match in enumerate(starts):
+                end = (
+                    starts[index + 1].start()
+                    if index + 1 < len(starts)
+                    else len(text)
+                )
+                regions.setdefault(match.group(1), text[match.start() : end])
+    return regions
+
+
+def _mount_compatible_subset(roots: list[Path], included: set[str]) -> set[str]:
+    """Compute which included NewX patches are mount-compatible.
+
+    Mirrors upstream's own classification: a patch is mount-compatible
+    when it does not declare itself unavailable on mount, does not use
+    the settings contribution DSL (which depends on the settings base
+    patch), and its dependsOn closure reaches neither a
+    standard-install-only patch nor a patch failing these checks.
+    """
+    regions = _val_regions(roots)
+    graph: dict[str, list[str]] = {}
+    region_dirty: dict[str, bool] = {}
+    for val, region in regions.items():
+        deps: list[str] = []
+        for dep_match in re.finditer(r"dependsOn\s*\(", region):
+            close_index, _ = _scan_parens(region, dep_match.end() - 1)
+            deps += re.findall(r"[A-Za-z_]\w*", region[dep_match.end() : close_index])
+        graph[val] = deps
+        region_dirty[val] = (
+            "unsupportedOnMount(" in region
+            or any(token in region for token in _SETTINGS_DSL_TOKENS)
+        )
+
+    def closure_dirty(val: str, visited: set[str]) -> bool:
+        if val in visited:
+            return False
+        visited.add(val)
+        if val in _STANDARD_ONLY_PATCHES or region_dirty.get(val, False):
+            return True
+        return any(closure_dirty(dep, visited) for dep in graph.get(val, []))
+
+    return {val for val in included if not closure_dirty(val, set())}
+
+
 def apply_one_patch_per_app(piko_directory: Path) -> dict:
-    """Strip feature patch names and inject the two umbrella patches."""
+    """Strip feature patch names and inject the umbrella patches."""
     kotlin_root = piko_directory / "patches" / "src" / "main" / "kotlin"
+    newx_root = kotlin_root / "app" / "crimera" / "patches" / "newx"
     plans = [
         (
             "x",
-            UMBRELLA_DIR / "NewXCombinedPatch.kt",
             [
-                kotlin_root / "app" / "crimera" / "patches",
+                (
+                    UMBRELLA_DIR / "NewXCombinedPatch.kt",
+                    newx_root / "NewXCombinedPatch.kt",
+                ),
+                (
+                    UMBRELLA_DIR / "NewXMountCombinedPatch.kt",
+                    newx_root / "NewXMountCombinedPatch.kt",
+                ),
             ],
-            kotlin_root
-            / "app" / "crimera" / "patches" / "newx"
-            / "NewXCombinedPatch.kt",
+            [kotlin_root / "app" / "crimera" / "patches"],
             {
                 "clonePatch",
                 "bringBackTwitterPatch",
@@ -617,22 +709,30 @@ def apply_one_patch_per_app(piko_directory: Path) -> dict:
         ),
         (
             "twitch",
-            UMBRELLA_DIR / "TwitchCombinedPatch.kt",
+            [
+                (
+                    UMBRELLA_DIR / "TwitchCombinedPatch.kt",
+                    kotlin_root
+                    / "dev" / "twitchpatches" / "patches" / "twitch"
+                    / "TwitchCombinedPatch.kt",
+                ),
+            ],
             [kotlin_root / "dev"],
-            kotlin_root
-            / "dev" / "twitchpatches" / "patches" / "twitch"
-            / "TwitchCombinedPatch.kt",
             {"inspectPlaybackPatch"},
         ),
     ]
     summary: dict = {}
-    for side, umbrella_file, roots, destination, excluded in plans:
+    for side, umbrellas, roots, excluded in plans:
         if not excluded <= set(COMBINED_EXCLUDED_PATCHES):
             raise ValueError(
                 f"Exclusions for {side} lack a documented reason: "
                 f"{sorted(excluded - set(COMBINED_EXCLUDED_PATCHES))}"
             )
-        manifest = set(_umbrella_dependencies(umbrella_file))
+        manifests = {
+            umbrella_file.stem: set(_umbrella_dependencies(umbrella_file))
+            for umbrella_file, _ in umbrellas
+        }
+        manifest = set().union(*manifests.values())
         stripped = _strip_names_under(roots)
         expected = manifest | excluded
         if stripped != expected:
@@ -645,16 +745,38 @@ def apply_one_patch_per_app(piko_directory: Path) -> dict:
                 "Update umbrella/*.kt or COMBINED_EXCLUDED_PATCHES consciously "
                 "(see docs/UPSTREAM.md)."
             )
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(umbrella_file, destination)
-        summary[side] = {
-            "umbrella": umbrella_file.stem,
-            "included": len(manifest),
-            "stripped": len(stripped),
-        }
+        entry: dict = {"stripped": len(stripped)}
+        if side == "x":
+            standard = manifests["NewXCombinedPatch"]
+            mount = manifests["NewXMountCombinedPatch"]
+            if not mount <= standard:
+                raise ValueError(
+                    "Mount umbrella must be a subset of the standard umbrella: "
+                    f"{sorted(mount - standard)}"
+                )
+            computed_mount = _mount_compatible_subset(roots, standard)
+            if computed_mount != mount:
+                raise ValueError(
+                    "Mount umbrella membership diverges from the computed "
+                    f"mount-compatible subset: umbrella has {sorted(mount)}, "
+                    f"computed {sorted(computed_mount)}. Review the new "
+                    "patches and update umbrella/NewXMountCombinedPatch.kt "
+                    "consciously (see docs/UPSTREAM.md)."
+                )
+            entry["umbrella"] = "NewXCombinedPatch"
+            entry["included"] = len(standard)
+            entry["mount_umbrella"] = "NewXMountCombinedPatch"
+            entry["mount_included"] = len(mount)
+        else:
+            entry["umbrella"] = umbrellas[0][0].stem
+            entry["included"] = len(manifest)
+        for umbrella_file, destination in umbrellas:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(umbrella_file, destination)
+        summary[side] = entry
         print(
             f"One patch per app ({side}): stripped names from "
-            f"{len(stripped)} feature patches, umbrella depends on "
+            f"{len(stripped)} feature patches, umbrellas depend on "
             f"{len(manifest)} of them"
         )
     summary["excluded"] = sorted(COMBINED_EXCLUDED_PATCHES)

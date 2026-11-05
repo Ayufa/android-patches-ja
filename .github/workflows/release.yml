@@ -84,11 +84,18 @@ jobs:
       - name: Verify bundle
         run: |
           set -euo pipefail
+          # The patches list is a published release asset (Morphe reads
+          # it to list this source's patches). Its generation is
+          # best-effort inside build_combined.py, so fail loudly here
+          # if it went missing -- v1.1.0 silently shipped without it
+          # when an upstream validation test blocked generation.
+          if [ ! -f bins/patches-list.json ]; then
+            echo "patches-list.json was not generated" >&2
+            exit 1
+          fi
           ARGS="bins/patches-${{ steps.version.outputs.version }}.mpp"
           ARGS="$ARGS --version ${{ steps.version.outputs.version }}"
-          if [ -f bins/patches-list.json ]; then
-            ARGS="$ARGS --patches-list bins/patches-list.json"
-          fi
+          ARGS="$ARGS --patches-list bins/patches-list.json"
           python3 scripts/verify_bundle.py $ARGS
 
       - name: Upload build artifacts
