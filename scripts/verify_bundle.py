@@ -345,9 +345,16 @@ def main() -> int:
         else:
             fail(f"Japanese settings resources missing: {JA_STRINGS_ENTRY}", failures)
 
-        manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8")
-        # Unfold continuation lines of the JAR manifest format.
-        manifest = manifest.replace("\r\n ", "").replace("\n ", "")
+        # Unfold continuation lines of the JAR manifest format at the
+        # byte level: lines wrap at 72 bytes, which can split a
+        # multi-byte UTF-8 character (the Japanese bundle description)
+        # across the wrap, so decoding first would fail.
+        manifest = (
+            archive.read("META-INF/MANIFEST.MF")
+            .replace(b"\r\n ", b"")
+            .replace(b"\n ", b"")
+            .decode("utf-8")
+        )
         fields = dict(
             line.split(": ", 1) for line in manifest.splitlines() if ": " in line
         )
