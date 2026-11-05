@@ -331,7 +331,41 @@ def inject_line_sources(piko_directory: Path) -> None:
     _strip_extension_dsl(
         piko_directory / "extensions" / "extension" / "build.gradle.kts"
     )
+    _rename_line_resource_ids(
+        build_kotlin
+        / "app"
+        / "andrewliang"
+        / "patches"
+        / "shared"
+        / "ResourceIds.kt"
+    )
     _append_proguard_keep(piko_directory)
+
+
+def _rename_line_resource_ids(build_file: Path) -> None:
+    """Rename the LINE shared map so the patcher 2.0.0 context cannot shadow it.
+
+    Upstream's shared/ResourceIds.kt keeps parsed resource ids in a
+    file-private ``val resourceIds = mutableMapOf<String, Long>()`` and
+    mutates it inside ``resourcePatch { execute { ... } }``. Upstream
+    builds against morphe-patcher 1.7.0, whose resource patch context
+    has no such member. The Piko build tree uses patcher 2.0.0, where
+    ResourcePatchContext declares ``val resourceIds: ResourceIds``;
+    inside the execute lambda that member shadows the file-private
+    map, so ``clear()`` and the ``set`` operator stop resolving and
+    compilation fails. Renaming the map in the build tree only (the
+    sources/line copy stays byte-identical to upstream) removes the
+    collision: exactly the declaration, the read in ``resourceId()``,
+    the ``clear()`` and the assignment are renamed.
+    """
+    text = build_file.read_text(encoding="utf-8")
+    renamed, count = re.subn(r"\bresourceIds\b", "lineResourceIds", text)
+    if count != 4:
+        raise ValueError(
+            f"Expected 4 resourceIds occurrences in {build_file}, found {count}"
+        )
+    build_file.write_text(renamed, encoding="utf-8")
+    print("Adapted ResourceIds.kt: renamed resourceIds map to lineResourceIds")
 
 
 def set_project_version(piko_directory: Path, version: str) -> None:
