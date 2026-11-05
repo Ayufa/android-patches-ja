@@ -12,9 +12,13 @@ crimera/piko (branch ``x-lite``), exactly like the piko-newx-ja builder:
    copy kept in this repository): patch sources, patch resources
    (reactnative/, hermes/), the extensions/twitch module and the
    shared/ivs-api compile-only sources it needs.
-5. Rewrite the bundle metadata (name/description/source/author) in the
+5. Restructure to one listed patch per app: strip the name/description
+   arguments from every feature patch declaration (making them
+   dependency-only) and inject the two umbrella patches from umbrella/,
+   whose dependsOn(...) pulls in each app's whole feature set.
+6. Rewrite the bundle metadata (name/description/source/author) in the
    temporary tree and set the bundle version.
-6. Run ``./gradlew clean buildAndroid`` and copy out
+7. Run ``./gradlew clean buildAndroid`` and copy out
    patches-<version>.mpp. A patches list is generated afterwards on a
    best-effort basis for verification/release metadata.
 
@@ -53,6 +57,40 @@ ADDRESOURCES_DIR = "patches/src/main/resources/addresources"
 # Twitch side: translated source copy of ryykitty/twitch-patched kept in
 # this repository (see docs/UPSTREAM.md). Injected into the build tree.
 TWITCH_SOURCES = REPO_ROOT / "sources" / "twitch"
+
+# One patch per app (v1.1.0+): the umbrella patch sources kept in this
+# repository. build_combined.py strips every feature patch's name at
+# build time (see apply_one_patch_per_app) and copies these into the
+# build tree, so Morphe's patch list shows exactly one patch per app.
+UMBRELLA_DIR = REPO_ROOT / "umbrella"
+
+# Feature patches deliberately NOT pulled in by the umbrellas. Each was
+# opt-in upstream (default = false) and cannot be disabled at runtime,
+# so applying it unconditionally would change the app for every user:
+#
+# - clonePatch (NewX: Clone): renames the app package name / app name
+#   from its patch options; unconditional application would turn every
+#   install into the clone, and an unlisted patch's options cannot be
+#   presented or changed in Morphe Manager.
+# - bringBackTwitterPatch (NewX: Restore Twitter branding): replaces
+#   the app label, icons and splash resources at patch time; resources
+#   cannot be toggled at runtime.
+# - newXAudioRenditionDiagnosticsPatch (NewX: Log HLS audio renditions):
+#   diagnostic logging hooks with no runtime off switch.
+# - inspectPlaybackPatch (Twitch: 再生の診断): wraps the playback HTTP
+#   client and installs tracing hooks; no runtime off switch.
+#
+# The patches' code still ships inside the bundle; it simply never
+# executes. Every other opt-in patch IS included, because its behaviour
+# is gated by an in-app settings toggle (NewX: Browse tweet object,
+# Hide post dividers, Server error logging) or performs no modification
+# at all (Twitch: Twitch APKを検査 only validates/logs at patch time).
+COMBINED_EXCLUDED_PATCHES = {
+    "clonePatch": "renames the app package/name; options not settable when unlisted",
+    "bringBackTwitterPatch": "replaces app branding at patch time; not runtime-toggleable",
+    "newXAudioRenditionDiagnosticsPatch": "always-on diagnostic logging; no runtime off switch",
+    "inspectPlaybackPatch": "always-on playback tracing hooks; no runtime off switch",
+}
 
 # Combined bundle metadata written into the temporary tree's
 # patches/build.gradle.kts about block (ends up in the .mpp MANIFEST).
@@ -291,6 +329,338 @@ def inject_twitch_sources(piko_directory: Path) -> None:
     _rewrite_about_block(piko_directory)
 
 
+# ---------------------------------------------------------------------------
+# One patch per app
+#
+# Morphe's PatchLoader only lists patches whose name is non-null (the
+# Patch KDoc in morphe-patcher states an unnamed patch "will not be
+# loaded by PatchLoader"), while unnamed patches still execute when a
+# listed patch depends on them. So the bundle ships one named umbrella
+# patch per app (umbrella/*.kt, kept in this repository) whose
+# dependsOn(...) lists the app's feature patches, and every feature
+# patch declaration has its `name`/`description` arguments stripped
+# here, in the throwaway build tree only. Kept sources stay pristine.
+#
+# The umbrella dependsOn lists double as the manifest of included
+# patches: the build fails if the set of named patches found upstream
+# differs from manifest + COMBINED_EXCLUDED_PATCHES, so a patch added,
+# removed or renamed upstream can never silently vanish from (or sneak
+# into) the combined bundle -- the daily sync must consciously add it to
+# an umbrella or to the exclusion list. See docs/UPSTREAM.md.
+
+_PATCH_BUILDER_CALL = re.compile(
+    r"\b(?:bytecodePatch|resourcePatch|rawResourcePatch)\s*\("
+)
+_PATCH_VAL_PREFIX = re.compile(
+    r"(?:(private|internal)\s+)?val\s+([A-Za-z_]\w*)\s*=\s*$"
+)
+_TOP_LEVEL_ARG_NAME = re.compile(r"\s*([A-Za-z_]\w*)\s*=")
+
+
+def _scan_parens(text: str, open_index: int) -> tuple[int, list[int]]:
+    """Scan the argument list whose '(' is at open_index.
+
+    Returns (close_index, top_level_comma_indexes). String literals
+    (plain, triple-quoted, with ${ } templates), char literals and
+    comments are honoured so brackets inside them do not count.
+    """
+    stack: list = ["code"]
+    template_brace_marks: list[int] = []
+    depth = 1
+    brace = 0
+    bracket = 0
+    commas: list[int] = []
+    i = open_index + 1
+    n = len(text)
+    while i < n:
+        mode = stack[-1]
+        char = text[i]
+        if mode == "code":
+            if text.startswith("//", i):
+                stack.append("line")
+                i += 2
+                continue
+            if text.startswith("/*", i):
+                stack.append("block")
+                i += 2
+                continue
+            if text.startswith('"""', i):
+                stack.append(("str", True))
+                i += 3
+                continue
+            if char == '"':
+                stack.append(("str", False))
+                i += 1
+                continue
+            if char == "'":
+                stack.append("char")
+                i += 1
+                continue
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    return i, commas
+            elif char == "{":
+                brace += 1
+            elif char == "}":
+                if (
+                    len(stack) > 1
+                    and template_brace_marks
+                    and brace == template_brace_marks[-1]
+                ):
+                    stack.pop()
+                    template_brace_marks.pop()
+                    i += 1
+                    continue
+                brace -= 1
+            elif char == "[":
+                bracket += 1
+            elif char == "]":
+                bracket -= 1
+            elif (
+                char == ","
+                and depth == 1
+                and brace == 0
+                and bracket == 0
+                and len(stack) == 1
+            ):
+                commas.append(i)
+            i += 1
+            continue
+        if mode == "line":
+            if char == "\n":
+                stack.pop()
+            i += 1
+            continue
+        if mode == "block":
+            if text.startswith("*/", i):
+                stack.pop()
+                i += 2
+                continue
+            i += 1
+            continue
+        if mode == "char":
+            if char == "\\":
+                i += 2
+                continue
+            if char == "'":
+                stack.pop()
+            i += 1
+            continue
+        # String literal modes: mode == ("str", triple)
+        triple = mode[1]
+        if triple and text.startswith('"""', i):
+            stack.pop()
+            i += 3
+            continue
+        if not triple and char == "\\":
+            i += 2
+            continue
+        if not triple and char == '"':
+            stack.pop()
+            i += 1
+            continue
+        if text.startswith("${", i):
+            stack.append("code")
+            template_brace_marks.append(brace)
+            i += 2
+            continue
+        i += 1
+    raise ValueError("Unbalanced parentheses while scanning patch declaration")
+
+
+@dataclass
+class _PatchDeclaration:
+    val: str | None
+    private: bool
+    has_name: bool
+    removable_args: list[tuple[int, int]]  # (start, end) of name/description args
+
+
+def _find_patch_declarations(text: str) -> list[_PatchDeclaration]:
+    """Find every patch builder call and classify its declaration."""
+    declarations: list[_PatchDeclaration] = []
+    for match in _PATCH_BUILDER_CALL.finditer(text):
+        open_index = match.end() - 1
+        close_index, commas = _scan_parens(text, open_index)
+        bounds = [open_index, *commas, close_index]
+        has_name = False
+        removable: list[tuple[int, int]] = []
+        for seg_start, seg_end in zip(bounds, bounds[1:]):
+            segment = text[seg_start + 1 : seg_end]
+            name_match = _TOP_LEVEL_ARG_NAME.match(segment)
+            if not name_match:
+                continue
+            arg_name = name_match.group(1)
+            if arg_name not in ("name", "description"):
+                continue
+            core_start = seg_start + 1 + (
+                len(segment) - len(segment.lstrip())
+            )
+            core_end = seg_start + 1 + len(segment.rstrip())
+            if arg_name == "name":
+                has_name = True
+            removable.append((core_start, core_end))
+        prefix = text[max(0, match.start() - 300) : match.start()]
+        val_match = _PATCH_VAL_PREFIX.search(prefix)
+        val = val_match.group(2) if val_match else None
+        private = bool(val_match and val_match.group(1) == "private")
+        if has_name and val is None:
+            raise ValueError(
+                "Named patch declaration without a val prefix near: "
+                + text[max(0, match.start() - 80) : match.start() + 40]
+            )
+        declarations.append(
+            _PatchDeclaration(
+                val=val, private=private, has_name=has_name,
+                removable_args=removable,
+            )
+        )
+    return declarations
+
+
+def _excision_interval(text: str, start: int, end: int) -> tuple[int, int]:
+    """Widen an argument span to include its comma and line layout."""
+    ahead = end
+    while ahead < len(text) and text[ahead] in " \t":
+        ahead += 1
+    if ahead < len(text) and text[ahead] == ",":
+        stop = ahead + 1
+        probe = stop
+        while probe < len(text) and text[probe] in " \t":
+            probe += 1
+        if probe < len(text) and text[probe] == "\n":
+            stop = probe + 1
+            while stop < len(text) and text[stop] in " \t":
+                stop += 1
+        return (start, stop)
+    behind = start
+    while behind > 0 and text[behind - 1] in " \t":
+        behind -= 1
+    if behind > 0 and text[behind - 1] == ",":
+        return (behind - 1, end)
+    return (start, end)
+
+
+def _strip_names_in_file(path: Path) -> list[str]:
+    """Remove name/description from public patch declarations in a file.
+
+    Returns the vals whose names were stripped. Private declarations
+    (already dependency-only upstream) are left untouched.
+    """
+    text = path.read_text(encoding="utf-8")
+    declarations = _find_patch_declarations(text)
+    intervals: list[tuple[int, int]] = []
+    stripped: list[str] = []
+    for declaration in declarations:
+        if not declaration.has_name or declaration.private:
+            continue
+        assert declaration.val is not None
+        stripped.append(declaration.val)
+        for arg_start, arg_end in declaration.removable_args:
+            intervals.append(_excision_interval(text, arg_start, arg_end))
+    if not intervals:
+        return stripped
+    new_text = text
+    for start, end in sorted(intervals, reverse=True):
+        new_text = new_text[:start] + new_text[end:]
+    remaining = _find_patch_declarations(new_text)
+    if len(remaining) != len(declarations):
+        raise ValueError(f"Patch declaration count changed in {path}")
+    for declaration in remaining:
+        if declaration.has_name and not declaration.private:
+            raise ValueError(
+                f"Public named patch {declaration.val} survived stripping in {path}"
+            )
+    path.write_text(new_text, encoding="utf-8")
+    return stripped
+
+
+def _strip_names_under(roots: list[Path]) -> set[str]:
+    stripped: set[str] = set()
+    for root in roots:
+        if not root.is_dir():
+            raise FileNotFoundError(f"Patch source root missing: {root}")
+        for kotlin_file in sorted(root.rglob("*.kt")):
+            stripped.update(_strip_names_in_file(kotlin_file))
+    return stripped
+
+
+def _umbrella_dependencies(umbrella_file: Path) -> list[str]:
+    text = umbrella_file.read_text(encoding="utf-8")
+    match = re.search(r"dependsOn\((.*?)\)", text, re.S)
+    if not match:
+        raise ValueError(f"No dependsOn block in umbrella patch {umbrella_file}")
+    return re.findall(r"[A-Za-z_]\w*", match.group(1))
+
+
+def apply_one_patch_per_app(piko_directory: Path) -> dict:
+    """Strip feature patch names and inject the two umbrella patches."""
+    kotlin_root = piko_directory / "patches" / "src" / "main" / "kotlin"
+    plans = [
+        (
+            "x",
+            UMBRELLA_DIR / "NewXCombinedPatch.kt",
+            [
+                kotlin_root / "app" / "crimera" / "patches",
+            ],
+            kotlin_root
+            / "app" / "crimera" / "patches" / "newx"
+            / "NewXCombinedPatch.kt",
+            {
+                "clonePatch",
+                "bringBackTwitterPatch",
+                "newXAudioRenditionDiagnosticsPatch",
+            },
+        ),
+        (
+            "twitch",
+            UMBRELLA_DIR / "TwitchCombinedPatch.kt",
+            [kotlin_root / "dev"],
+            kotlin_root
+            / "dev" / "twitchpatches" / "patches" / "twitch"
+            / "TwitchCombinedPatch.kt",
+            {"inspectPlaybackPatch"},
+        ),
+    ]
+    summary: dict = {}
+    for side, umbrella_file, roots, destination, excluded in plans:
+        if not excluded <= set(COMBINED_EXCLUDED_PATCHES):
+            raise ValueError(
+                f"Exclusions for {side} lack a documented reason: "
+                f"{sorted(excluded - set(COMBINED_EXCLUDED_PATCHES))}"
+            )
+        manifest = set(_umbrella_dependencies(umbrella_file))
+        stripped = _strip_names_under(roots)
+        expected = manifest | excluded
+        if stripped != expected:
+            missing = sorted(expected - stripped)
+            unexpected = sorted(stripped - expected)
+            raise ValueError(
+                f"One-patch restructure mismatch for {side}: "
+                f"declared upstream but not in umbrella/exclusions: {unexpected}; "
+                f"in umbrella/exclusions but not declared upstream: {missing}. "
+                "Update umbrella/*.kt or COMBINED_EXCLUDED_PATCHES consciously "
+                "(see docs/UPSTREAM.md)."
+            )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(umbrella_file, destination)
+        summary[side] = {
+            "umbrella": umbrella_file.stem,
+            "included": len(manifest),
+            "stripped": len(stripped),
+        }
+        print(
+            f"One patch per app ({side}): stripped names from "
+            f"{len(stripped)} feature patches, umbrella depends on "
+            f"{len(manifest)} of them"
+        )
+    summary["excluded"] = sorted(COMBINED_EXCLUDED_PATCHES)
+    return summary
+
+
 def set_project_version(piko_directory: Path, version: str) -> None:
     """Set the version only in the temporary Piko checkout used for a build."""
     properties_path = piko_directory / "gradle.properties"
@@ -325,6 +695,7 @@ class CombinedBuild:
     supported_versions: frozenset[str]
     twitch_base: str
     patches_list: Path | None = field(default=None)
+    one_patch_per_app: dict = field(default_factory=dict)
 
 
 def build_combined(
@@ -361,6 +732,7 @@ def build_combined(
         pre_build_cleanup(piko_directory)
         apply_japanese_localization(piko_directory)
         inject_twitch_sources(piko_directory)
+        one_patch_per_app = apply_one_patch_per_app(piko_directory)
         set_project_version(piko_directory, bundle_version)
 
         subprocess.run(
@@ -421,6 +793,7 @@ def build_combined(
         supported_versions=supported_versions,
         twitch_base=twitch_base_version(),
         patches_list=patches_list,
+        one_patch_per_app=one_patch_per_app,
     )
 
 
@@ -458,6 +831,7 @@ def main() -> None:
         "x_supported_versions": sorted(result.supported_versions),
         "twitch_base_version": result.twitch_base,
         "patches_list_generated": result.patches_list is not None,
+        "one_patch_per_app": result.one_patch_per_app,
     }
     metadata_path.write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n",

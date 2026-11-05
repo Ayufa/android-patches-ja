@@ -16,7 +16,7 @@
 ## X 側（Piko / NewX）: ビルド時クローン＋オーバーレイ
 
 - パッチ本体のソースはこのリポジトリに保持しません。ビルド（`build_combined.py`）のたびに、本家 `crimera/piko` の `x-lite` ブランチの最新を浅いクローンで取得し、NewX 以外（Instagram／旧 Twitter 向けパッチと拡張）を取り除いてからビルドします。したがって X 側は常に本家の最新に追従します。
-- 日本語化はリソースのオーバーレイのみです。`localization/values-ja-rJP/newx/strings.xml`（Piko 設定 UI 全486件）を、クローンしたツリーの `addresources/values-ja-rJP/` へコピーします。パッチ本体のコードには一切手を入れません。
+- 日本語化はリソースのオーバーレイのみです。`localization/values-ja-rJP/newx/strings.xml`（Piko 設定 UI 全486件）を、クローンしたツリーの `addresources/values-ja-rJP/` へコピーします。保持する形ではパッチ本体のコードに手を入れません（ビルド時の使い捨てツリー内だけで行う「アプリごとに1パッチ」化の宣言書き換えを除く。後述）。
 - ビルドスクリプト自体は本家 `crimera/piko-newx` のビルダー（Ayufa/piko-newx-ja で日本語化したもの）が原型です。本家ビルダーに変更があった場合は、差分を確認したうえで `build_combined.py` に取り込みます。
 - 本家に新しい文字列が増えたら、ビルドログに未訳キーが表示されます。翻訳を追加する手順は `localization/README.md` にあります。
 
@@ -31,6 +31,25 @@
   5. 取り込みコミットには規約型 `i18n` を使います。
 - 本家のバージョンタグはこのリポジトリには取り込みません。このリポジトリのバージョニングは独立です（後述）。`sources/twitch/CHANGELOG.md` の先頭が、取り込み元の本家バージョンを示します。
 
+## アプリごとに1パッチ（v1.1.0〜）
+
+v1.1.0 から、Morphe のパッチ一覧にはアプリごとに1件だけ表示します（X は「X（NewX）日本語化パッチ」、Twitch は「Twitch 日本語化パッチ」）。個別機能のオン・オフは、適用後のアプリ内設定画面（NewX 設定／Twitch「パッチ設定」）で行います。仕組みは次のとおりです。
+
+- Morphe の PatchLoader は、名前（`name`）を持つパッチだけを一覧に載せます。名前の無いパッチは一覧に出ませんが、他のパッチから依存（`dependsOn`）されれば通常どおり実行されます（morphe-patcher 2.0.0 の `Patch` の KDoc と `PatchLoader` の実装で確認）。
+- そこで、アプリごとに名前付きの「傘パッチ」を1つだけ用意し（`umbrella/NewXCombinedPatch.kt` と `umbrella/TwitchCombinedPatch.kt` をこのリポジトリに保持）、その `dependsOn` に各アプリの機能パッチを並べます。
+- ビルド時（使い捨てツリー内のみ）に、全機能パッチの宣言から `name` / `description` 引数を取り除き、依存専用パッチに変えます（`build_combined.py` の `apply_one_patch_per_app`）。保持しているソース（`sources/twitch/` 等）は変更しません。
+- 傘パッチの `dependsOn` 一覧が、そのまま「含める機能パッチ」の台帳です。ビルドは、本家側で見つかった名前付きパッチの集合が「傘パッチの一覧＋除外リスト（後述）」と一致しないと失敗します。本家がパッチを追加・削除・改名したら、日次同期は自動でやり過ごさず、次の判断をしてから傘パッチか除外リストを更新してください。
+  - 標準で有効なパッチ、またはアプリ内設定で切り替えできる任意パッチ → 傘パッチの `dependsOn` に追加する。
+  - 任意パッチ（本家で `default = false`）で、アプリ内設定で無効化できず、一律適用するとアプリの見た目・動作が変わるもの → `build_combined.py` の `COMBINED_EXCLUDED_PATCHES` に理由付きで追加する。
+- 除外中（傘パッチに含めない）のは次の4件です。コード自体はバンドル内に残りますが、実行されません。
+  - `clonePatch`（NewX: Clone）: パッケージ名／アプリ名をパッチのオプションで変更する。一律適用すると全員のアプリが複製版になり、一覧に出ないパッチのオプションは Morphe Manager で設定できない。
+  - `bringBackTwitterPatch`（NewX: Restore Twitter branding）: アプリ名・アイコン・スプラッシュのリソースを旧 Twitter 仕様に置き換える。リソースは実行時に切り替えできない。
+  - `newXAudioRenditionDiagnosticsPatch`（NewX: Log HLS audio renditions）: 診断ログのフック。オフにする設定が無い。
+  - `inspectPlaybackPatch`（Twitch: 再生の診断）: 再生 HTTP クライアントへのラップとトレースフック。オフにする設定が無い。
+- 逆に、任意パッチでも次は傘パッチに含めています（アプリ内設定で切り替え可能、またはアプリ自体を変更しないため）。
+  - NewX: Browse tweet object（設定トグルあり。初期値オン、設定でオフ可）、Hide post dividers（設定トグルあり。初期値オフ）、Server error logging（設定トグルあり。初期値オン、設定でオフ可）。
+  - Twitch: Twitch APKを検査（パッチ適用時の検証とログのみで、アプリを変更しない）。
+
 ## ビルド時の適応（使い捨てツリー内のみ）
 
 統合ビルドでは、本家 Piko のビルドツリー（Morphe Gradle プラグイン 1.3.4 系）へ Twitch 側を注入するため、次の小さな適応をビルドのたびに使い捨てツリー内で行います。保持しているソース自体は変更しません。
@@ -39,6 +58,7 @@
 - `extensions/proguard-rules.pro` に `-keep class dev.twitchpatches.**` を追加する（本家の keep 対象は `app.morphe.**` 等のみで、Twitch 拡張のクラス名参照を守るため）。
 - `patches/build.gradle.kts` の `about` ブロック（バンドル名・説明・配布元・作者・ライセンス）を、このプロジェクトの値に書き換える。
 - バージョンは `gradle.properties` の `version` を、このリポジトリのリリースバージョンに設定する。
+- アプリごとに1パッチ化: 全機能パッチ宣言の `name` / `description` 引数の除去と、傘パッチ2ファイルの注入（上記「アプリごとに1パッチ」参照）。
 
 ## リリースとバージョニング
 

@@ -9,9 +9,13 @@ Checks that the single bundle really contains both patch sets:
 - MANIFEST metadata points at this project and carries a
   Patcher-Version.
 - the Japanese overlay holds the full Piko settings translation.
-- patch inventory: when a patches-list.json from the build is given,
-  every listed patch name must be present in classes.dex; names are
-  grouped per app (``NewX:`` prefix = X, everything else = Twitch).
+- patch inventory: the bundle lists exactly ONE patch per app
+  (v1.1.0+ umbrella structure). When a patches-list.json from the
+  build is given, it must contain exactly 2 patches -- one targeting
+  com.twitter.android, one targeting tv.twitch.android.app -- and
+  both names must be present in classes.dex. The feature patch code
+  of both sets (which is no longer listed individually) is checked
+  via code markers in classes.dex and the extension payloads.
 
 Writes a bundle-summary.json next to the bundle and exits non-zero
 when any check fails.
@@ -30,14 +34,23 @@ EXPECTED_EXTENSIONS = {
     "extensions/twitch.mpe",
 }
 JA_STRINGS_ENTRY = "addresources/values-ja-rJP/newx/strings.xml"
-# Stable sample of translated Twitch patch names (see
-# sources/twitch/patches-list history / LOCALIZATION docs). Used to
-# sanity-check the dex even when no patches list was generated.
-TWITCH_NAME_SAMPLES = [
-    "BTTV、FFZ、7TVのエモート",
-    "削除されたメッセージを表示",
-    "配信中の広告をブロック",
+# The two umbrella patches are the only listed patches since v1.1.0.
+UMBRELLA_PATCHES = {
+    "com.twitter.android": "X（NewX）日本語化パッチ",
+    "tv.twitch.android.app": "Twitch 日本語化パッチ",
+}
+# Code markers proving both feature patch sets survived in classes.dex
+# even though the feature patches are no longer listed by name: class
+# descriptor prefixes of both sets, plus the settings key of a
+# settings-gated opt-in NewX patch (Hide post dividers).
+DEX_CODE_MARKERS = [
+    b"app/crimera/patches/newx",
+    b"dev/twitchpatches/patches",
+    b"newx.timeline.hide_post_dividers",
 ]
+# The Twitch settings screen title must be inside the Twitch extension
+# payload (the feature toggles live there at runtime).
+TWITCH_EXTENSION_MARKER = "パッチ設定"
 
 
 def fail(message: str, failures: list[str]) -> None:
@@ -49,13 +62,24 @@ def ok(message: str) -> None:
     print(f"ok: {message}")
 
 
-def load_patch_names(patches_list_path: Path) -> list[str]:
+def load_patches(patches_list_path: Path) -> list[dict]:
+    """Return [{name, packages}] from a generated patches-list.json."""
     data = json.loads(patches_list_path.read_text(encoding="utf-8"))
-    if isinstance(data, list):
-        # Piko generator format: a plain list of names.
-        return [str(item) for item in data]
-    # Twitch generator format: {"patches": [{"name": ...}, ...]}.
-    return [str(patch["name"]) for patch in data["patches"]]
+    entries = data["patches"] if isinstance(data, dict) else data
+    patches = []
+    for entry in entries:
+        if isinstance(entry, str):
+            patches.append({"name": entry, "packages": []})
+        else:
+            compat = entry.get("compatiblePackages") or []
+            if isinstance(compat, dict):
+                packages = sorted(compat.keys())
+            else:
+                packages = sorted(
+                    item["packageName"] for item in compat if item.get("packageName")
+                )
+            patches.append({"name": str(entry["name"]), "packages": packages})
+    return patches
 
 
 def main() -> int:
@@ -95,6 +119,12 @@ def main() -> int:
             fail("classes.dex missing", failures)
             dex = b""
         summary["dex_bytes"] = len(dex)
+
+        twitch_ext = (
+            archive.read("extensions/twitch.mpe")
+            if "extensions/twitch.mpe" in names
+            else b""
+        )
 
         rn_assets = [n for n in names if n.startswith("reactnative/") and n.endswith(".js")]
         if len(rn_assets) >= 20:
@@ -143,39 +173,63 @@ def main() -> int:
         else:
             fail("MANIFEST has no Patcher-Version", failures)
 
-    newx_names: list[str] = []
-    twitch_names: list[str] = []
-    if args.patches_list:
-        all_names = load_patch_names(Path(args.patches_list))
-        newx_names = [n for n in all_names if n.startswith("NewX:")]
-        twitch_names = [n for n in all_names if not n.startswith("NewX:")]
-        missing = [n for n in all_names if n.encode("utf-8") not in dex]
-        if missing:
-            fail(f"patch names missing from classes.dex: {missing}", failures)
+    # Both feature patch sets must be present as code even though only
+    # the two umbrella patches are listed by name.
+    for marker in DEX_CODE_MARKERS:
+        if marker in dex:
+            ok(f"dex code marker present: {marker.decode()}")
         else:
-            ok(f"all {len(all_names)} listed patch names found in classes.dex")
+            fail(f"dex code marker missing: {marker.decode()}", failures)
+    if TWITCH_EXTENSION_MARKER.encode("utf-8") in twitch_ext:
+        ok("Twitch extension contains the パッチ設定 screen strings")
     else:
-        newx_occurrences = len(re.findall(rb"NewX: ", dex))
-        if newx_occurrences >= 40:
-            ok(f"dex contains {newx_occurrences} 'NewX: ' patch name strings")
-            newx_names = [f"<{newx_occurrences} occurrences in dex>"]
-        else:
-            fail(f"only {newx_occurrences} 'NewX: ' strings in dex", failures)
-        for sample in TWITCH_NAME_SAMPLES:
-            if sample.encode("utf-8") in dex:
-                ok(f"Twitch patch name in dex: {sample}")
-                twitch_names.append(sample)
-            else:
-                fail(f"Twitch patch name missing from dex: {sample}", failures)
+        fail("Twitch extension lacks パッチ設定 strings", failures)
 
-    summary["newx_patch_count"] = (
-        len(newx_names) if args.patches_list else None
+    listed: list[dict] = []
+    if args.patches_list:
+        listed = load_patches(Path(args.patches_list))
+        if len(listed) == len(UMBRELLA_PATCHES):
+            ok(f"patches list contains exactly {len(listed)} patches")
+        else:
+            fail(
+                f"patches list contains {len(listed)} patches, "
+                f"expected exactly {len(UMBRELLA_PATCHES)} (one per app)",
+                failures,
+            )
+        seen_packages: set[str] = set()
+        for patch in listed:
+            for package in patch["packages"]:
+                seen_packages.add(package)
+                expected_name = UMBRELLA_PATCHES.get(package)
+                if expected_name is None:
+                    fail(f"listed patch targets unexpected app: {package}", failures)
+                elif patch["name"] != expected_name:
+                    fail(
+                        f"listed patch for {package} is {patch['name']!r}, "
+                        f"expected {expected_name!r}",
+                        failures,
+                    )
+            if patch["name"].encode("utf-8") not in dex:
+                fail(f"listed patch name missing from classes.dex: {patch['name']}", failures)
+        missing_apps = set(UMBRELLA_PATCHES) - seen_packages
+        if missing_apps:
+            fail(f"no listed patch for app(s): {sorted(missing_apps)}", failures)
+    else:
+        for package, name in UMBRELLA_PATCHES.items():
+            if name.encode("utf-8") in dex:
+                ok(f"umbrella patch for {package} found in dex: {name}")
+                listed.append({"name": name, "packages": [package]})
+            else:
+                fail(f"umbrella patch name missing from dex: {name}", failures)
+
+    summary["listed_patches"] = listed
+    summary["listed_patch_count"] = len(listed)
+    summary["newx_patch_count"] = sum(
+        1 for p in listed if "com.twitter.android" in p["packages"]
     )
-    summary["twitch_patch_count"] = (
-        len(twitch_names) if args.patches_list else None
+    summary["twitch_patch_count"] = sum(
+        1 for p in listed if "tv.twitch.android.app" in p["packages"]
     )
-    summary["newx_patches"] = newx_names
-    summary["twitch_patches"] = twitch_names
 
     summary_path = (
         Path(args.summary)
