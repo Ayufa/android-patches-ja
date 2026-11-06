@@ -544,19 +544,92 @@ def _add_kakao_ja_locale(resources_file: Path) -> None:
     print("Adapted Resources.kt: added ja-rJP locale for KakaoTalk resources")
 
 
+# Upstream vendors a small app.morphe library inside its patches
+# module (the settings-preference DSL and resource helpers). The
+# host's Morphe library does not ship those classes (the KakaoTalk
+# patches fail with unresolved SwitchPreference without them), so
+# the vendored sources are injected too — except these two:
+# - patches/all/misc/resources/AddResourcesPatch.kt: the host
+#   library already provides addAppResources (the Piko set compiles
+#   against it), and a second source definition would clash.
+# - util/PatchListGenerator.kt: a standalone build utility that no
+#   patch source references.
+_KAKAO_VENDORED_EXCLUDES = {
+    "patches/all/misc/resources/AddResourcesPatch.kt",
+    "util/PatchListGenerator.kt",
+}
+
+
+def _copy_kakao_vendored_library(piko_directory: Path) -> None:
+    """Inject upstream's vendored app.morphe patches-module library.
+
+    Copies file by file and refuses to overwrite a host file whose
+    content differs, so a future host-side addition in the same
+    package surfaces as an error instead of a silent replacement.
+    """
+    source_root = (
+        KAKAO_SOURCES / "patches" / "src" / "main" / "kotlin" / "app" / "morphe"
+    )
+    target_root = (
+        piko_directory / "patches" / "src" / "main" / "kotlin" / "app" / "morphe"
+    )
+    copied = 0
+    for source in sorted(source_root.rglob("*.kt")):
+        relative = source.relative_to(source_root).as_posix()
+        if relative in _KAKAO_VENDORED_EXCLUDES:
+            continue
+        target = target_root / relative
+        if target.exists():
+            if target.read_bytes() != source.read_bytes():
+                raise ValueError(
+                    "Vendored library file would overwrite a different "
+                    f"host file: app/morphe/{relative}"
+                )
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        copied += 1
+    print(f"Injected {copied} vendored Morphe library files for KakaoTalk")
+
+
+def _add_kakao_metadata_dependency(piko_directory: Path) -> None:
+    """Add kotlin-metadata-jvm to the build tree's patches module.
+
+    KakaoTalk's message-details code reads Kotlin metadata
+    (kotlin.metadata.jvm.*); upstream declares
+    implementation(kotlin("metadata-jvm")) in its
+    patches/build.gradle.kts and the host's file does not.
+    Build-tree only; the sources/piko copy is untouched.
+    """
+    build_file = piko_directory / "patches" / "build.gradle.kts"
+    text = build_file.read_text(encoding="utf-8")
+    if 'kotlin("metadata-jvm")' in text:
+        print("KakaoTalk: kotlin metadata-jvm dependency already present")
+        return
+    anchor = "    implementation(libs.gson)\n"
+    if text.count(anchor) != 1:
+        raise ValueError(f"Unexpected dependencies block in {build_file}")
+    text = text.replace(
+        anchor, anchor + '    implementation(kotlin("metadata-jvm"))\n', 1
+    )
+    build_file.write_text(text, encoding="utf-8")
+    print("Adapted patches/build.gradle.kts: added kotlin metadata-jvm")
+
+
 def inject_kakao_sources(piko_directory: Path) -> None:
     """Copy the KakaoTalk patch set from sources/kakao into the build tree.
 
     Only the KakaoTalk patches enter the bundle. The source copy
     keeps upstream's full tree, but the other apps' patch sources
     (dcinside/, soop/, chzzk/, flexcil/, navermap/,
-    samsungkeyboard/, starnote/), the rest of shared/ and all/, the
-    other apps' addresources and extension modules, and upstream's
-    vendored app/morphe library sources are not injected (the host
-    build resolves app.morphe.* against its own Morphe library,
-    exactly like the Piko patch set does). No proguard keep is
-    needed: the host's extensions/proguard-rules.pro already keeps
-    app.revanced.**, which covers app.revanced.extension.kakaotalk.**.
+    samsungkeyboard/, starnote/), the rest of shared/ and all/, and
+    the other apps' addresources and extension modules are not
+    injected. Upstream's vendored app.morphe patches-module library
+    sources ARE injected (see _copy_kakao_vendored_library): the
+    host library lacks the settings-preference DSL they provide.
+    No proguard keep is needed: the host's
+    extensions/proguard-rules.pro already keeps app.revanced.**,
+    which covers app.revanced.extension.kakaotalk.**.
     """
     kakao_kotlin = KAKAO_SOURCES / "patches" / "src" / "main" / "kotlin" / "app" / "revanced"
     build_kotlin = piko_directory / "patches" / "src" / "main" / "kotlin" / "app" / "revanced"
@@ -564,6 +637,8 @@ def inject_kakao_sources(piko_directory: Path) -> None:
     _copy_tree(kakao_kotlin / "util", build_kotlin / "util")
     for relative in _KAKAO_SHARED_FILES:
         _copy_file(kakao_kotlin / "patches" / relative, build_kotlin / "patches" / relative)
+    _copy_kakao_vendored_library(piko_directory)
+    _add_kakao_metadata_dependency(piko_directory)
     _add_kakao_ja_locale(build_kotlin / "patches" / "kakaotalk" / "shared" / "Resources.kt")
 
     kakao_resources = KAKAO_SOURCES / "patches" / "src" / "main" / "resources"
