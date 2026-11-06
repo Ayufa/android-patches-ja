@@ -626,6 +626,47 @@ def _add_kakao_metadata_dependency(piko_directory: Path) -> None:
     print("Adapted patches/build.gradle.kts: added kotlin metadata-jvm")
 
 
+def _rewrite_kakao_read_all_bytes(piko_directory: Path) -> None:
+    """Replace InputStream.readAllBytes() in the KakaoTalk patches.
+
+    The host's :patches module runs AnimalSniffer against the
+    Android API 29 signature (gummy-bears), which does not contain
+    InputStream.readAllBytes (Java 9+); upstream does not run that
+    check, so its two call sites pass there but fail here. Kotlin's
+    readBytes() extension is the API-safe equivalent — the Twitch
+    set already uses it in this module and passes the check. The
+    rewrite happens in the build tree only, and the replacement
+    count is asserted so a new upstream call site surfaces as an
+    error instead of a silent extra rewrite.
+    """
+    root = (
+        piko_directory
+        / "patches"
+        / "src"
+        / "main"
+        / "kotlin"
+        / "app"
+        / "revanced"
+        / "patches"
+        / "kakaotalk"
+    )
+    replaced = 0
+    for source in sorted(root.rglob("*.kt")):
+        text = source.read_text(encoding="utf-8")
+        count = text.count(".readAllBytes()")
+        if count:
+            source.write_text(
+                text.replace(".readAllBytes()", ".readBytes()"), encoding="utf-8"
+            )
+            replaced += count
+    if replaced != 2:
+        raise ValueError(
+            f"Expected 2 readAllBytes() call sites in KakaoTalk patches, "
+            f"found {replaced}"
+        )
+    print("Adapted KakaoTalk patches: readAllBytes() -> readBytes() (2 sites)")
+
+
 def inject_kakao_sources(piko_directory: Path) -> None:
     """Copy the KakaoTalk patch set from sources/kakao into the build tree.
 
@@ -649,6 +690,7 @@ def inject_kakao_sources(piko_directory: Path) -> None:
         _copy_file(kakao_kotlin / "patches" / relative, build_kotlin / "patches" / relative)
     _copy_kakao_vendored_library(piko_directory)
     _add_kakao_metadata_dependency(piko_directory)
+    _rewrite_kakao_read_all_bytes(piko_directory)
     _strip_kakao_locale_narrowing(build_kotlin / "patches" / "kakaotalk" / "shared" / "Resources.kt")
 
     kakao_resources = KAKAO_SOURCES / "patches" / "src" / "main" / "resources"
