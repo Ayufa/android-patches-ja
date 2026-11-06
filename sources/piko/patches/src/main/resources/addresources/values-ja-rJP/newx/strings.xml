@@ -58,7 +58,7 @@
     <string name="piko_newx_hide_ai_generated_posts_auto_detected">自動検出</string>
     <string name="piko_newx_hide_ai_generated_posts_source_not_identified">AIの出典が未特定</string>
     <string name="piko_newx_show_sensitive_media_title">センシティブなメディアを表示</string>
-    <string name="piko_newx_show_sensitive_media_summary">確認なしでセンシティブなメディアを表示する</string>
+    <string name="piko_newx_show_sensitive_media_summary">確認なしでセンシティブなメディアと年齢制限付きメディアを表示する</string>
     <string name="piko_newx_show_poll_results_title">投票せずにアンケート結果を表示</string>
     <string name="piko_newx_show_poll_results_summary">結果がある場合、投票前にアンケートの割合を表示する</string>
     <string name="piko_newx_default_reply_sorting_title">返信のデフォルト並び順</string>
