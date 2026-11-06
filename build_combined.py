@@ -521,41 +521,51 @@ def _adapt_kakao_extension_build(build_file: Path) -> None:
     print(f"Adapted {build_file}: namespace + morphe extensions library dep")
 
 
-def _add_kakao_ja_locale(resources_file: Path) -> None:
-    """Register the Japanese locale for the KakaoTalk addresources.
+def _strip_kakao_locale_narrowing(resources_file: Path) -> None:
+    """Drop the setAddResourceLocale call from KakaoTalk's Resources.kt.
 
     Upstream's kakaotalk/shared/Resources.kt narrows the global
-    addresources locale list to the default locale and Korean
-    (setAddResourceLocale), so the translated
-    addresources/values-ja-rJP/kakaotalk/strings.xml would never be
-    merged into a patched app. The build tree's copy of the file
-    gains AppLocale("ja-rJP", "ja") so Japanese is merged exactly
-    like Korean; the sources/kakao copy stays byte-identical to
-    upstream. (Patching runs target one app at a time, so narrowing
-    the shared locale list cannot affect the other patch sets.)
+    addresources locale list to the default locale and Korean via
+    setAddResourceLocale, an internal of upstream's vendored
+    AddResourcesPatch that the host Morphe library does not expose
+    (CI: unresolved reference). The host library's addAppResources
+    merges every bundled addresources locale folder by default —
+    that is how the Piko set's values-ja-rJP strings ship — so
+    removing the narrowing makes KakaoTalk merge the default,
+    Korean and Japanese strings exactly like Piko. The build tree's
+    copy loses only the call and its import; the sources/kakao copy
+    stays byte-identical to upstream.
     """
     text = resources_file.read_text(encoding="utf-8")
-    anchor = '    AppLocale("ko-rKR", "ko"),\n'
-    if text.count(anchor) != 1:
-        raise ValueError(f"Unexpected locales list in {resources_file}")
-    if '"ja-rJP"' not in text:
-        text = text.replace(anchor, anchor + '    AppLocale("ja-rJP", "ja"),\n', 1)
-        resources_file.write_text(text, encoding="utf-8")
-    print("Adapted Resources.kt: added ja-rJP locale for KakaoTalk resources")
+    call = "    setAddResourceLocale(localesKakaoTalk)\n"
+    import_line = (
+        "import app.morphe.patches.all.misc.resources.setAddResourceLocale\n"
+    )
+    if text.count(call) != 1 or text.count(import_line) != 1:
+        raise ValueError(f"Unexpected Resources.kt shape in {resources_file}")
+    text = text.replace(import_line, "", 1).replace(call, "", 1)
+    resources_file.write_text(text, encoding="utf-8")
+    print("Adapted Resources.kt: removed setAddResourceLocale narrowing")
 
 
 # Upstream vendors a small app.morphe library inside its patches
 # module (the settings-preference DSL and resource helpers). The
 # host's Morphe library does not ship those classes (the KakaoTalk
 # patches fail with unresolved SwitchPreference without them), so
-# the vendored sources are injected too — except these two:
+# the vendored sources are injected too — except these three:
 # - patches/all/misc/resources/AddResourcesPatch.kt: the host
-#   library already provides addAppResources (the Piko set compiles
-#   against it), and a second source definition would clash.
+#   library already provides addAppResources/AppLocale publicly
+#   (the Piko set compiles against them); only the file's
+#   setAddResourceLocale is not public there, and the KakaoTalk
+#   Resources.kt adaptation below removes that one call instead.
+# - patches/util/resource/CheckStringResources.kt: a standalone
+#   main() checker that also references the DC Inside locale list;
+#   no patch source calls it.
 # - util/PatchListGenerator.kt: a standalone build utility that no
 #   patch source references.
 _KAKAO_VENDORED_EXCLUDES = {
     "patches/all/misc/resources/AddResourcesPatch.kt",
+    "patches/util/resource/CheckStringResources.kt",
     "util/PatchListGenerator.kt",
 }
 
@@ -639,7 +649,7 @@ def inject_kakao_sources(piko_directory: Path) -> None:
         _copy_file(kakao_kotlin / "patches" / relative, build_kotlin / "patches" / relative)
     _copy_kakao_vendored_library(piko_directory)
     _add_kakao_metadata_dependency(piko_directory)
-    _add_kakao_ja_locale(build_kotlin / "patches" / "kakaotalk" / "shared" / "Resources.kt")
+    _strip_kakao_locale_narrowing(build_kotlin / "patches" / "kakaotalk" / "shared" / "Resources.kt")
 
     kakao_resources = KAKAO_SOURCES / "patches" / "src" / "main" / "resources"
     build_resources = piko_directory / "patches" / "src" / "main" / "resources"
