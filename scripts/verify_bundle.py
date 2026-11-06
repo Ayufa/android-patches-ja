@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 """Verify a combined Ayufa Patches JP bundle (.mpp).
 
-Checks that the single bundle really contains all three patch sets:
+Checks that the single bundle really contains all four patch sets:
 
-- bundle structure: patch classes dex plus all four extension
-  payloads (newx, shared, twitch, extension) and both resource sets
-  (addresources with the Japanese settings resources, reactnative/,
-  hermes/).
+- bundle structure: patch classes dex plus all five extension
+  payloads (newx, shared, twitch, extension, kakaotalk) and the
+  resource sets (addresources with the Japanese settings resources,
+  reactnative/, hermes/).
 - MANIFEST metadata points at this project and carries a
   Patcher-Version.
 - the Japanese settings resources hold the full Piko settings
-  translation.
+  translation and the full KakaoTalk settings translation.
 - patch inventory: since v1.2.0 the bundle ships upstream's patches
   individually again (no umbrella patches). When a patches-list.json
   from the build is given, it must contain exactly the patches of the
-  three source copies -- 52 for X (com.twitter.android), 14 for
-  Twitch (tv.twitch.android.app; upstream 13 plus one Ayufa original)
-  and 32 for LINE (jp.naver.line.android). Since v1.2.1 the patch NAMES are
+  four source copies -- 52 for X (com.twitter.android), 14 for
+  Twitch (tv.twitch.android.app; upstream 13 plus one Ayufa original),
+  32 for LINE (jp.naver.line.android) and 76 for KakaoTalk
+  (com.kakao.talk) -- plus upstream's named universal patch
+  "Disable Sentry telemetry" (no compatible packages; the KakaoTalk
+  "Disable Sentry" patch depends on it, and it is part of upstream's
+  own patches-list.json). Since v1.2.1 the patch NAMES are
   upstream's English names, never translated: the Morphe patcher
   executes patches sorted by name, so translated names changed the
   execution order versus upstream and broke patches on device (see
@@ -42,11 +46,21 @@ EXPECTED_EXTENSIONS = {
     "extensions/shared.mpe",
     "extensions/twitch.mpe",
     "extensions/extension.mpe",
+    "extensions/kakaotalk.mpe",
 }
 JA_STRINGS_ENTRY = "addresources/values-ja-rJP/newx/strings.xml"
-# The full listed patch inventory of the three source copies
+JA_KAKAO_STRINGS_ENTRY = "addresources/values-ja-rJP/kakaotalk/strings.xml"
+# Named patches with no compatible packages that upstream ships and
+# the bundle legitimately contains: "Disable Sentry telemetry" is a
+# shared dependency of the KakaoTalk "Disable Sentry" patch (see
+# sources/kakao/UPSTREAM_BASE.md). Its description is translated
+# like the KakaoTalk descriptions.
+EXPECTED_UNIVERSAL_PATCHES = {
+    "Disable Sentry telemetry",
+}
+# The full listed patch inventory of the four source copies
 # (sources/piko @ 340dd02, sources/twitch @ v1.5.0 base,
-# sources/line @ v3.10.0 base). Patch names
+# sources/line @ v3.10.0 base, sources/kakao @ v1.5.0 base). Patch names
 # are upstream's English names and are NEVER translated (the patcher
 # sorts execution by name; see docs/UPSTREAM.md). The X list is kept
 # in the exact order of upstream crimera/piko-newx v3.73.0's
@@ -161,6 +175,87 @@ EXPECTED_PATCHES = {
         "[Ad] Remove banner ads",
         "[General] Andrew's Patch Setting",
     },
+    # KakaoTalk patches from AmpleReVanced/revanced-patches (v1.5.0 base).
+    # Only the KakaoTalk set is bundled; upstream's other apps' patches
+    # are not injected into the build (see docs/UPSTREAM.md).
+    "com.kakao.talk": {
+        "Add Packet Handler",
+        "Add Pine Lib",
+        "Add settings resources",
+        "Add settings tab",
+        "Allow Hide on Any Chat",
+        "Allow Open Chat Managers To Block Members",
+        "Allow custom profile images",
+        "Allow direct thread reply editing",
+        "Allow invisible characters",
+        "Allow open chat media bundle",
+        "Allow profile media download",
+        "Allow reply to feed",
+        "Always Show Kick Button",
+        "Block reactions on deleted or hidden messages",
+        "Block replies on deleted or hidden messages",
+        "Bypass Moat check",
+        "Bypass input mention limit in non-multichat",
+        "Change model",
+        "Change package name",
+        "Custom branding",
+        "Default external browser",
+        "Disable 300+ unread limit",
+        "Disable 99 unread limit",
+        "Disable AdFit environment detection",
+        "Disable ChatRoomAdController",
+        "Disable Collapse Button",
+        "Disable Community Tab",
+        "Disable Friend Feed tab",
+        "Disable Friend Lists ad",
+        "Disable OpenChat feed ad",
+        "Disable Pay banner ad",
+        "Disable S2Event",
+        "Disable SDK Tracker",
+        "Disable Sentry",
+        "Disable ShortForm ad",
+        "Disable Talk Share Log",
+        "Disable abuse detection report",
+        "Disable chat room list ad",
+        "Disable navigation bar animation",
+        "Disable open chat room comments",
+        "Disable verifying signature",
+        "Enable Markdown",
+        "Enable send big text",
+        "Force enable debug mode",
+        "Force enable emoticon plus feature",
+        "Ghost Mode",
+        "Hide More tab Game tab",
+        "Hide More tab components",
+        "Hook Package Manager",
+        "Ignore forward restriction",
+        "Open profile from open chat feed",
+        "Override feature flag",
+        "Register settings activity",
+        "Remove BizBoard ads",
+        "Remove More tab ad",
+        "Remove OpenLink chat room list ad",
+        "Remove Short-form Tab",
+        "Remove feed ad",
+        "Remove focus ad",
+        "Remove local connect tab",
+        "Remove native ad",
+        "Remove shop tab",
+        "Remove tab banner ads",
+        "Restore keyword notification log",
+        "Show chatroom channel ID",
+        "Show deleted, hidden, or edited messages",
+        "Show message details",
+        "Show message read receipts",
+        "Show messages restricted to mobile",
+        "Spoof App ID",
+        "Spoof apk checksums",
+        "Spoof attestation package name",
+        "Spoof installer package name",
+        "Spoof signature",
+        "Strip image metadata",
+        "Version info patch",
+    },
 }
 # Upstream crimera/piko-newx v3.73.0's published patches-list.json
 # order for X (the generated list must keep this order).
@@ -218,14 +313,17 @@ EXPECTED_X_ORDER = [
     "NewX: Filter posts by keyword",
     "NewX: Translator",
 ]
-EXPECTED_LISTED_COUNT = sum(len(names) for names in EXPECTED_PATCHES.values())
-# Code markers proving all three patch sets survived in classes.dex,
+EXPECTED_LISTED_COUNT = sum(
+    len(names) for names in EXPECTED_PATCHES.values()
+) + len(EXPECTED_UNIVERSAL_PATCHES)
+# Code markers proving all four patch sets survived in classes.dex,
 # plus the settings key of a settings-gated opt-in NewX patch (Hide
 # post dividers).
 DEX_CODE_MARKERS = [
     b"app/crimera/patches/newx",
     b"dev/twitchpatches/patches",
     b"app/andrewliang/patches",
+    b"app/revanced/patches/kakaotalk",
     b"newx.timeline.hide_post_dividers",
 ]
 # The Twitch settings screen title must be inside the Twitch extension
@@ -234,6 +332,10 @@ TWITCH_EXTENSION_MARKER = "パッチ設定"
 # A LINE settings switch label must be inside the LINE extension
 # payload (the "Andrew's Patch Setting" screen lives there at runtime).
 LINE_EXTENSION_MARKER = "トークを未読のままにする"
+# The KakaoTalk extension payload must carry the KakaoTalk extension
+# classes (its settings UI text lives in the addresources strings,
+# so a class-name marker is used instead of a UI string).
+KAKAO_EXTENSION_MARKER = "app/revanced/extension/kakaotalk"
 
 
 def fail(message: str, failures: list[str]) -> None:
@@ -319,6 +421,11 @@ def main() -> int:
             if "extensions/extension.mpe" in names
             else b""
         )
+        kakao_ext = (
+            archive.read("extensions/kakaotalk.mpe")
+            if "extensions/kakaotalk.mpe" in names
+            else b""
+        )
 
         rn_assets = [n for n in names if n.startswith("reactnative/") and n.endswith(".js")]
         if len(rn_assets) >= 20:
@@ -344,6 +451,29 @@ def main() -> int:
             summary["ja_overlay_strings"] = string_count
         else:
             fail(f"Japanese settings resources missing: {JA_STRINGS_ENTRY}", failures)
+
+        if JA_KAKAO_STRINGS_ENTRY in names:
+            kakao_ja_xml = archive.read(JA_KAKAO_STRINGS_ENTRY).decode("utf-8")
+            kakao_string_count = len(re.findall(r"<string\s+name=", kakao_ja_xml))
+            if kakao_string_count >= 187:
+                ok(
+                    "Japanese KakaoTalk settings resources present: "
+                    f"{kakao_string_count} strings"
+                )
+            else:
+                fail(
+                    "Japanese KakaoTalk settings resources too small: "
+                    f"{kakao_string_count} strings",
+                    failures,
+                )
+            if not re.search(r"[\u3040-\u30ff]", kakao_ja_xml):
+                fail("Japanese KakaoTalk settings resources contain no kana", failures)
+            summary["ja_kakao_strings"] = kakao_string_count
+        else:
+            fail(
+                f"Japanese KakaoTalk settings resources missing: {JA_KAKAO_STRINGS_ENTRY}",
+                failures,
+            )
 
         # Unfold continuation lines of the JAR manifest format at the
         # byte level: lines wrap at 72 bytes, which can split a
@@ -387,6 +517,10 @@ def main() -> int:
         ok("LINE extension contains the translated settings screen strings")
     else:
         fail("LINE extension lacks translated settings screen strings", failures)
+    if KAKAO_EXTENSION_MARKER.encode("utf-8") in kakao_ext:
+        ok("KakaoTalk extension contains the KakaoTalk extension classes")
+    else:
+        fail("KakaoTalk extension lacks the KakaoTalk extension classes", failures)
 
     listed: list[dict] = []
     if args.patches_list:
@@ -399,11 +533,19 @@ def main() -> int:
                 f"expected exactly {EXPECTED_LISTED_COUNT} "
                 f"(X {len(EXPECTED_PATCHES['com.twitter.android'])} + "
                 f"Twitch {len(EXPECTED_PATCHES['tv.twitch.android.app'])} + "
-                f"LINE {len(EXPECTED_PATCHES['jp.naver.line.android'])})",
+                f"LINE {len(EXPECTED_PATCHES['jp.naver.line.android'])} + "
+                f"KakaoTalk {len(EXPECTED_PATCHES['com.kakao.talk'])} + "
+                f"universal {len(EXPECTED_UNIVERSAL_PATCHES)})",
                 failures,
             )
         seen: set[tuple[str, str]] = set()
         for patch in listed:
+            if not patch["packages"] and patch["name"] not in EXPECTED_UNIVERSAL_PATCHES:
+                fail(
+                    f"listed patch has no compatible packages and is not a "
+                    f"known universal patch: {patch['name']!r}",
+                    failures,
+                )
             for package in patch["packages"]:
                 seen.add((package, patch["name"]))
                 expected_names = EXPECTED_PATCHES.get(package)
@@ -471,6 +613,9 @@ def main() -> int:
     summary["line_patch_count"] = sum(
         1 for p in listed if "jp.naver.line.android" in p["packages"]
     )
+    summary["kakao_patch_count"] = sum(
+        1 for p in listed if "com.kakao.talk" in p["packages"]
+    )
 
     summary_path = (
         Path(args.summary)
@@ -485,7 +630,8 @@ def main() -> int:
     print(
         f"patches: NewX (X) = {summary['newx_patch_count']}, "
         f"Twitch = {summary['twitch_patch_count']}, "
-        f"LINE = {summary['line_patch_count']}"
+        f"LINE = {summary['line_patch_count']}, "
+        f"KakaoTalk = {summary['kakao_patch_count']}"
     )
 
     if failures:

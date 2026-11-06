@@ -1,8 +1,8 @@
 # 日本語化の方針と範囲（ayufa-patches-jp）
 
-いずれも「本家をクローンし、言語だけを日本語にする」方式で、翻訳済みソースのコピーを保持します（X 側: `sources/piko/`、Twitch 側: `sources/twitch/`、LINE 側: `sources/line/`）。
+いずれも「本家をクローンし、言語だけを日本語にする」方式で、翻訳済みソースのコピーを保持します（X 側: `sources/piko/`、Twitch 側: `sources/twitch/`、LINE 側: `sources/line/`、KakaoTalk 側: `sources/kakao/`）。
 
-**恒久ルール: パッチ名（タイトル）は絶対に翻訳しません。** Morphe のパッチャーはパッチを名前の文字列順に実行するため、名前を変えると実行順序が本家と入れ替わり、本家で成功する構成でも失敗します（X 12.39.0-prod.01 で実証済み。詳細は `docs/UPSTREAM.md` の「既知の問題」）。3アプリとも、パッチ宣言の `name` は本家の英語名のまま保持し、日本語化するのは `description` とアプリ内 UI 文字列だけです。本家が新しいパッチを追加した場合も同じです。
+**恒久ルール: パッチ名（タイトル）は絶対に翻訳しません。** Morphe のパッチャーはパッチを名前の文字列順に実行するため、名前を変えると実行順序が本家と入れ替わり、本家で成功する構成でも失敗します（X 12.39.0-prod.01 で実証済み。詳細は `docs/UPSTREAM.md` の「既知の問題」）。4アプリとも、パッチ宣言の `name` は本家の英語名のまま保持し、日本語化するのは `description` とアプリ内 UI 文字列だけです。本家が新しいパッチを追加した場合も同じです。
 
 ## X 側（Piko / NewX）: ソース直接翻訳方式
 
@@ -98,6 +98,36 @@ Twitch 側には、本家に無い Ayufa の独自パッチ「Ayufa: Startup tab
 
 1. 本家が LINE パッチの説明を変えたり、新しい LINE パッチを足したりしたら、説明だけを日本語に訳してコピーへ反映し、`scripts/verify_bundle.py` の `EXPECTED_PATCHES`（`jp.naver.line.android`）を更新します。名前は本家の英語名をそのまま使います（新しいパッチも同様。絶対に翻訳しない）。
 2. 本家が「Andrew's Patch Setting」画面に表示文字列を足したら、`LineSettingsScreen.java` の該当文字列を翻訳します。設定キーや機能IDは変えません。
+
+## KakaoTalk 側: X 側と同じ addresources 方式
+
+本家 `AmpleReVanced/revanced-patches` の KakaoTalk パッチには、X 側と同じ
+addresources の仕組みがあります。設定 UI の文字列
+`patches/src/main/resources/addresources/values/kakaotalk/strings.xml`（全187件）には
+本家に韓国語訳（`values-ko-rKR`）だけがあり、日本語訳は存在しません。
+そのため X 側と同じく、コピー側に日本語リソースを実ファイルとして追加します。
+収録範囲は KakaoTalk 向けパッチだけです。コピーは本家のツリー全体
+（他アプリ向けパッチを含む）を保持しますが、他アプリ分は翻訳もしませんし、
+バンドルにも入りません（ビルドへの注入時に除外。詳細は `docs/UPSTREAM.md`）。
+
+翻訳するもの:
+
+- KakaoTalk 設定 UI の表示文字列 全187件: `sources/kakao/patches/src/main/resources/addresources/values-ja-rJP/kakaotalk/strings.xml` に実ファイルとして保持します（本家に無い日本語リソースの追加）。英語版ファイル冒頭のコメントにある raw 文字列の引用ルール（改行を含む文字列は引用符で囲み、改行をエンコードしない）に従います。なお `values/kakaotalk/arrays.xml` は本家でも空のため、日本語版は作りません。
+- Morphe のパッチ一覧に表示される説明: パッチ宣言（Kotlin ソース）の `description` 全76件を日本語に書き換えています。共有の依存パッチ「Disable Sentry telemetry」（対象アプリを指定しない共通パッチ。KakaoTalk の「Disable Sentry」が依存）の説明も併せて日本語化しています。`name` は本家の英語名のままです（上記の恒久ルール）。
+
+翻訳しないもの:
+
+- 拡張機能コード内の文字列。KakaoTalk 拡張の表示文字列はすべて addresources の文字列リソース経由で、`resString()` の英語フォールバックや設定キー（`kakaotalk_*`）などの内部識別子は英語のままにします。
+- パッチのオプション（`stringOption` 等）のラベル・説明（英語のまま。X 側と同じ方針）。
+- 名前の無い土台パッチ（`baseChangePackageNamePatch` など）の説明。Morphe の一覧には出ません。
+- ブランド名・サービス名: KakaoTalk、KakaoPay、Kakao Now、AdFit、BizBoard、Sentry、GitHub、Telegram など。
+- 例外メッセージ、ログ、内部エラー文字列。
+
+### KakaoTalk 側の更新手順（本家に新しい文字列が増えたら）
+
+1. 本家 `values/kakaotalk/strings.xml` のキーと、`sources/kakao/` の日本語ファイルのキーを比べます。
+2. 増えたキーを翻訳して日本語ファイルに追加します。**プレースホルダ（`%1$s`、`%1$d`、`%2$d` など）は英語版と完全一致**させてください。件数表示は「{全体}件中{一部}件」のように日本語の語順に入れ替えます（プレースホルダの番号自体は英語版と対応させます）。
+3. 本家がパッチ宣言の説明を変えたり、新しい KakaoTalk パッチを足したりしたら、説明だけを日本語に訳してコピーへ反映し、`scripts/verify_bundle.py` の `EXPECTED_PATCHES`（`com.kakao.talk`）を更新します。名前は本家の英語名をそのまま使います（新しいパッチも同様。絶対に翻訳しない）。
 
 ## 表記の方針
 

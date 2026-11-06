@@ -2,6 +2,13 @@
 
 このプロジェクトのバージョンは、バンドル全体に対する独立したセマンティックバージョニング（`vX.Y.Z`）で管理します。上流（crimera/piko、ryykitty/twitch-patched）のバージョンとは連動しません。方針は [docs/UPSTREAM.md](docs/UPSTREAM.md) を参照してください。
 
+## [1.5.0] - 2026-11-06
+
+- **KakaoTalk のパッチを追加**（本家 [AmpleReVanced/revanced-patches](https://github.com/AmpleReVanced/revanced-patches) v1.5.0 ベース）。広告の除去、タブの非表示、削除・非表示・編集されたメッセージの表示、既読確認の表示、ゴーストモード、各種の整合性チェック回避など、KakaoTalk 向けパッチ全76件を収録。対応 KakaoTalk バージョンは 26.9.0。同じ本家の他アプリ（DC Inside、AfreecaTV/SOOP、Naver ゲームコミュニティ、Onyx Note、Flexcil、Naver Map、Samsung Keyboard、Chzzk、StarNote）向けパッチは収録していません。なお、KakaoTalk の「Disable Sentry」が依存する共通パッチ「Disable Sentry telemetry」も併せて収録しています。
+- パッチの説明（全76件＋共通パッチ1件）と、KakaoTalk の設定画面に追加される「Morphe設定」の設定 UI（文字列リソース全187件）を日本語化。パッチ名は恒久ルールどおり本家の英語名のままです（実行順序を本家と一致させるため）。
+- 方式は X / Twitch / LINE と同じ「本家をクローンし、言語だけを日本語にする」で、翻訳済みソースのコピーを `sources/kakao/` に保持します。本家へは読み取り専用の一方向のみで、書き込みは一切しません。
+- 本バージョンはまずプレリリースとして公開し、本人の実機確認を経てから正式版にします。
+
 ## [1.4.0] - 2026-11-05
 
 - **LINE のパッチを追加**（本家 [andrewliang25/morphe-patches](https://github.com/andrewliang25/morphe-patches) v3.10.0 ベース）。タブやボタンの非表示、広告の非表示、送信取消しされたメッセージの保持、トークを未読のままにする、カスタムフォント、再署名ビルド向けの修正など、LINE 向けパッチ全32件を収録。対応 LINE バージョンは 26.14.0 / 26.15.1 / 26.16.0。同じ本家の Facebook 向けパッチは収録していません。

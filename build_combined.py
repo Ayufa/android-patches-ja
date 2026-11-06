@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the combined Ayufa Patches JP bundle (one .mpp).
 
-All three patch sets are kept in this repository as translated source
+All four patch sets are kept in this repository as translated source
 copies (the "clone upstream + translate only" model, v1.2.0+):
 
 - sources/piko: a copy of upstream crimera/piko (branch ``x-lite``,
@@ -18,6 +18,11 @@ copies (the "clone upstream + translate only" model, v1.2.0+):
   but only the LINE patch set is injected; the Facebook patch sources
   stay out of the bundle. The upstream base commit is recorded in
   sources/line/UPSTREAM_BASE.md.
+- sources/kakao: a translated source copy of
+  AmpleReVanced/revanced-patches. The copy keeps upstream's full
+  tree, but only the KakaoTalk patch set is injected; the other apps'
+  patches (DC Inside, SOOP, ...) stay out of the bundle. The
+  upstream base commit is recorded in sources/kakao/UPSTREAM_BASE.md.
 
 The build itself adds no patch machinery of its own:
 
@@ -30,9 +35,14 @@ The build itself adds no patch machinery of its own:
    module and the shared/ivs-api compile-only sources it needs.
 4. Inject the LINE patch set from sources/line: the LINE and shared
    patch sources and the extensions/extension module.
-5. Rewrite the bundle metadata (name/description/source/author) in
+5. Inject the KakaoTalk patch set from sources/kakao: the KakaoTalk
+   patch sources and the shared/all helpers they import, the patch
+   resources (kakaotalk/, settings/, addresources), the
+   extensions/kakaotalk module (with its nested stub project) and
+   the shared-library preference sources it compiles against.
+6. Rewrite the bundle metadata (name/description/source/author) in
    the temporary tree and set the bundle version.
-6. Run ``./gradlew clean buildAndroid`` and copy out
+7. Run ``./gradlew clean buildAndroid`` and copy out
    patches-<version>.mpp. A patches list is generated afterwards on a
    best-effort basis for verification/release metadata; the release
    workflow fails if the list is missing (v1.1.0 shipped without one).
@@ -75,11 +85,17 @@ TWITCH_SOURCES = REPO_ROOT / "sources" / "twitch"
 # set is injected into the build tree; the Facebook patches are not.
 LINE_SOURCES = REPO_ROOT / "sources" / "line"
 
+# KakaoTalk side: translated source copy of
+# AmpleReVanced/revanced-patches kept in this repository (see
+# docs/UPSTREAM.md). Only its KakaoTalk patch set is injected into
+# the build tree; the other apps' patches are not.
+KAKAO_SOURCES = REPO_ROOT / "sources" / "kakao"
+
 # Combined bundle metadata written into the temporary tree's
 # patches/build.gradle.kts about block (ends up in the .mpp MANIFEST).
 BUNDLE_NAME = "Ayufa Patches JP"
 BUNDLE_DESCRIPTION = (
-    "X (NewX)・Twitch・LINE の Morphe パッチを1つにまとめた日本語化バンドル"
+    "X (NewX)・Twitch・LINE・KakaoTalk の Morphe パッチを1つにまとめた日本語化バンドル"
 )
 BUNDLE_SOURCE = "https://github.com/Ayufa/ayufa-patches-jp"
 BUNDLE_AUTHOR = "Ayufa"
@@ -368,6 +384,255 @@ def _rename_line_resource_ids(build_file: Path) -> None:
     print("Adapted ResourceIds.kt: renamed resourceIds map to lineResourceIds")
 
 
+# Single patch-source files the KakaoTalk patches import from
+# upstream's shared/ and all/ subtrees (import inventory taken from
+# the KakaoTalk sources; see sources/kakao/UPSTREAM_BASE.md). All
+# are nameless base patches / factories, except
+# shared/misc/privacy/DisableSentryTelemetry.kt, which declares the
+# named universal patch "Disable Sentry telemetry" that the
+# KakaoTalk "Disable Sentry" patch depends on (it is part of
+# upstream's own patches-list.json with no compatible packages).
+_KAKAO_SHARED_FILES = (
+    "shared/misc/packagename/ChangePackageNamePatch.kt",
+    "shared/misc/string/ReplaceStringPatch.kt",
+    "shared/misc/privacy/DisableSentryTelemetry.kt",
+    "all/misc/build/BaseSpoofBuildInfoPatch.kt",
+    "all/misc/versioncode/ChangeVersionCodePatch.kt",
+    "all/misc/transformation/TransformInstructionsPatch.kt",
+)
+
+# Version-catalog entries the KakaoTalk extension module needs but
+# the Piko build tree's gradle/libs.versions.toml does not carry.
+# Versions and coordinates are upstream's own (sources/kakao/gradle/
+# libs.versions.toml); annotation and appcompat already exist in the
+# host catalog and are not repeated here.
+_KAKAO_CATALOG_VERSIONS = (
+    'exifinterface = "1.4.2"',
+    'okhttp = "5.5.0"',
+    'retrofit = "3.0.0"',
+    'hiddenapibypass = "6.1"',
+    'netty = "4.2.16.Final"',
+)
+_KAKAO_CATALOG_LIBRARIES = (
+    'exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }',
+    'okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }',
+    'retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }',
+    'hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }',
+    'netty-all = { module = "io.netty:netty-all", version.ref = "netty" }',
+)
+
+
+def _copy_file(source: Path, destination: Path) -> None:
+    if not source.is_file():
+        raise FileNotFoundError(f"Source file is missing: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    print(f"Copied file: {source} -> {destination}")
+
+
+def _add_kakao_catalog_aliases(piko_directory: Path) -> None:
+    """Add the KakaoTalk extension's catalog aliases to the build tree.
+
+    extensions/kakaotalk references libs.okhttp, libs.retrofit,
+    libs.netty.all, libs.hiddenapibypass and libs.exifinterface,
+    which the host catalog does not define. The aliases are inserted
+    at the end of the [versions] and [libraries] sections of the
+    build tree's catalog only; each insertion is skipped when the
+    key already exists.
+    """
+    catalog = piko_directory / "gradle" / "libs.versions.toml"
+    text = catalog.read_text(encoding="utf-8")
+
+    def section_span(text: str, section: str) -> tuple[int, int]:
+        marker = f"[{section}]"
+        start = text.find(marker)
+        if start == -1:
+            raise ValueError(f"No [{section}] section in {catalog}")
+        next_section = text.find("\n[", start + len(marker))
+        return start, len(text) if next_section == -1 else next_section
+
+    def missing_in_section(text: str, section: str, lines: tuple[str, ...]) -> list[str]:
+        start, end = section_span(text, section)
+        body = text[start:end]
+        return [
+            line
+            for line in lines
+            if not re.search(rf"^{re.escape(line.split(' =')[0])}\s*=", body, re.M)
+        ]
+
+    def append_to_section(text: str, section: str, lines: list[str]) -> str:
+        _, end = section_span(text, section)
+        addition = "".join(line + "\n" for line in lines)
+        return text[:end] + "\n" + addition + text[end:]
+
+    version_lines = missing_in_section(text, "versions", _KAKAO_CATALOG_VERSIONS)
+    if version_lines:
+        text = append_to_section(text, "versions", version_lines)
+    library_lines = missing_in_section(text, "libraries", _KAKAO_CATALOG_LIBRARIES)
+    if library_lines:
+        text = append_to_section(text, "libraries", library_lines)
+    catalog.write_text(text, encoding="utf-8")
+    print(
+        "Adapted gradle/libs.versions.toml: added KakaoTalk extension "
+        f"aliases ({len(version_lines)} versions, {len(library_lines)} libraries)"
+    )
+
+
+def _adapt_kakao_extension_build(build_file: Path) -> None:
+    """Adapt extensions/kakaotalk/build.gradle.kts to the host build.
+
+    Two build-tree-only changes (the sources/kakao copy is untouched):
+
+    - Declare the module namespace explicitly. Upstream's plugin
+      2.0.0 derives it from the settings defaultNamespace
+      ("app.revanced.extension") plus the module name; the host's
+      plugin 1.3.4 extensions (newx, twitch, extension) all declare
+      their namespace in the build file instead, so the same value
+      upstream effectively uses is written out here.
+    - Add compileOnly(libs.morphe.extensions.library). Upstream's
+      shared library exposes the Morphe extensions library as `api`,
+      so the KakaoTalk module compiled against
+      app.morphe.extension.shared.* through it. The host's
+      :extensions:shared:library carries it as `implementation`
+      (not visible to consumers), and the host's own extension
+      modules declare the same compileOnly line themselves
+      (see extensions/newx in the Piko tree).
+    """
+    text = build_file.read_text(encoding="utf-8")
+    if "namespace" not in text:
+        anchor = "android {\n    compileSdk = 36\n"
+        if text.count(anchor) != 1:
+            raise ValueError(f"Unexpected android block in {build_file}")
+        text = text.replace(
+            anchor,
+            "android {\n    namespace = \"app.revanced.extension.kakaotalk\"\n    compileSdk = 36\n",
+            1,
+        )
+    dep_anchor = "    compileOnly(libs.netty.all)\n"
+    if "libs.morphe.extensions.library" not in text:
+        if text.count(dep_anchor) != 1:
+            raise ValueError(f"Unexpected dependencies block in {build_file}")
+        text = text.replace(
+            dep_anchor,
+            dep_anchor + "    compileOnly(libs.morphe.extensions.library)\n",
+            1,
+        )
+    build_file.write_text(text, encoding="utf-8")
+    print(f"Adapted {build_file}: namespace + morphe extensions library dep")
+
+
+def _add_kakao_ja_locale(resources_file: Path) -> None:
+    """Register the Japanese locale for the KakaoTalk addresources.
+
+    Upstream's kakaotalk/shared/Resources.kt narrows the global
+    addresources locale list to the default locale and Korean
+    (setAddResourceLocale), so the translated
+    addresources/values-ja-rJP/kakaotalk/strings.xml would never be
+    merged into a patched app. The build tree's copy of the file
+    gains AppLocale("ja-rJP", "ja") so Japanese is merged exactly
+    like Korean; the sources/kakao copy stays byte-identical to
+    upstream. (Patching runs target one app at a time, so narrowing
+    the shared locale list cannot affect the other patch sets.)
+    """
+    text = resources_file.read_text(encoding="utf-8")
+    anchor = '    AppLocale("ko-rKR", "ko"),\n'
+    if text.count(anchor) != 1:
+        raise ValueError(f"Unexpected locales list in {resources_file}")
+    if '"ja-rJP"' not in text:
+        text = text.replace(anchor, anchor + '    AppLocale("ja-rJP", "ja"),\n', 1)
+        resources_file.write_text(text, encoding="utf-8")
+    print("Adapted Resources.kt: added ja-rJP locale for KakaoTalk resources")
+
+
+def inject_kakao_sources(piko_directory: Path) -> None:
+    """Copy the KakaoTalk patch set from sources/kakao into the build tree.
+
+    Only the KakaoTalk patches enter the bundle. The source copy
+    keeps upstream's full tree, but the other apps' patch sources
+    (dcinside/, soop/, chzzk/, flexcil/, navermap/,
+    samsungkeyboard/, starnote/), the rest of shared/ and all/, the
+    other apps' addresources and extension modules, and upstream's
+    vendored app/morphe library sources are not injected (the host
+    build resolves app.morphe.* against its own Morphe library,
+    exactly like the Piko patch set does). No proguard keep is
+    needed: the host's extensions/proguard-rules.pro already keeps
+    app.revanced.**, which covers app.revanced.extension.kakaotalk.**.
+    """
+    kakao_kotlin = KAKAO_SOURCES / "patches" / "src" / "main" / "kotlin" / "app" / "revanced"
+    build_kotlin = piko_directory / "patches" / "src" / "main" / "kotlin" / "app" / "revanced"
+    _copy_tree(kakao_kotlin / "patches" / "kakaotalk", build_kotlin / "patches" / "kakaotalk")
+    _copy_tree(kakao_kotlin / "util", build_kotlin / "util")
+    for relative in _KAKAO_SHARED_FILES:
+        _copy_file(kakao_kotlin / "patches" / relative, build_kotlin / "patches" / relative)
+    _add_kakao_ja_locale(build_kotlin / "patches" / "kakaotalk" / "shared" / "Resources.kt")
+
+    kakao_resources = KAKAO_SOURCES / "patches" / "src" / "main" / "resources"
+    build_resources = piko_directory / "patches" / "src" / "main" / "resources"
+    _copy_tree(kakao_resources / "kakaotalk", build_resources / "kakaotalk")
+    _copy_tree(kakao_resources / "settings", build_resources / "settings")
+    # The settings resource root is shared with the DC Inside patch
+    # set upstream; its two files are not referenced by any KakaoTalk
+    # patch and stay out of the bundle.
+    for dcinside_file in (
+        "layout/morphe_dcinside_settings.xml",
+        "xml/morphe_dcinside_settings_preferences.xml",
+    ):
+        stale = build_resources / "settings" / dcinside_file
+        if stale.exists():
+            stale.unlink()
+            print(f"Removed non-KakaoTalk settings resource: {dcinside_file}")
+    for values_dir in ("values", "values-ko-rKR", "values-ja-rJP"):
+        _copy_tree(
+            kakao_resources / "addresources" / values_dir / "kakaotalk",
+            build_resources / "addresources" / values_dir / "kakaotalk",
+        )
+
+    _copy_tree(
+        KAKAO_SOURCES / "extensions" / "kakaotalk",
+        piko_directory / "extensions" / "kakaotalk",
+    )
+    _adapt_kakao_extension_build(
+        piko_directory / "extensions" / "kakaotalk" / "build.gradle.kts"
+    )
+    # The KakaoTalk extension compiles against the Morphe preference
+    # UI classes (app.morphe.extension.shared.settings.preference.*)
+    # that upstream vendors as sources in its own shared library.
+    # The host's :extensions:shared:library does not carry them, so
+    # the same sources are added to the build tree's shared library,
+    # where they are dexed into extensions/shared.mpe just like
+    # upstream (and where the host's own PikoSharedPrefCategory
+    # already lives in the same package).
+    _copy_tree(
+        KAKAO_SOURCES
+        / "extensions"
+        / "shared"
+        / "library"
+        / "src"
+        / "main"
+        / "java"
+        / "app"
+        / "morphe"
+        / "extension"
+        / "shared"
+        / "settings"
+        / "preference",
+        piko_directory
+        / "extensions"
+        / "shared"
+        / "library"
+        / "src"
+        / "main"
+        / "java"
+        / "app"
+        / "morphe"
+        / "extension"
+        / "shared"
+        / "settings"
+        / "preference",
+    )
+    _add_kakao_catalog_aliases(piko_directory)
+
+
 def set_project_version(piko_directory: Path, version: str) -> None:
     """Set the version only in the temporary Piko tree used for a build."""
     properties_path = piko_directory / "gradle.properties"
@@ -399,6 +664,18 @@ def twitch_base_version() -> str:
 def line_base_version() -> str:
     """Version of the upstream morphe-patches release the copy is based on."""
     changelog = LINE_SOURCES / "CHANGELOG.md"
+    if changelog.is_file():
+        match = re.search(
+            r"\[(\d+\.\d+\.\d+)\]", changelog.read_text(encoding="utf-8")
+        )
+        if match:
+            return match.group(1)
+    return "unknown"
+
+
+def kakao_base_version() -> str:
+    """Version of the upstream revanced-patches release the copy is based on."""
+    changelog = KAKAO_SOURCES / "CHANGELOG.md"
     if changelog.is_file():
         match = re.search(
             r"\[(\d+\.\d+\.\d+)\]", changelog.read_text(encoding="utf-8")
@@ -517,6 +794,7 @@ class CombinedBuild:
     supported_versions: frozenset[str]
     twitch_base: str
     line_base: str
+    kakao_base: str
     patches_list: Path | None = field(default=None)
 
 
@@ -542,6 +820,7 @@ def build_combined(
         report_translation_coverage(piko_directory)
         inject_twitch_sources(piko_directory)
         inject_line_sources(piko_directory)
+        inject_kakao_sources(piko_directory)
         set_project_version(piko_directory, bundle_version)
 
         subprocess.run(
@@ -594,6 +873,7 @@ def build_combined(
         supported_versions=supported_versions,
         twitch_base=twitch_base_version(),
         line_base=line_base_version(),
+        kakao_base=kakao_base_version(),
         patches_list=patches_list,
     )
 
@@ -633,6 +913,7 @@ def main() -> None:
         "x_supported_versions": sorted(result.supported_versions),
         "twitch_base_version": result.twitch_base,
         "line_base_version": result.line_base,
+        "kakao_base_version": result.kakao_base,
         "patches_list_generated": result.patches_list is not None,
     }
     metadata_path.write_text(
